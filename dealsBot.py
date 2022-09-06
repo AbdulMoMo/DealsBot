@@ -16,11 +16,8 @@ class hunter(discord.Client):
 
     def cleanGameDeals(self, count, method):
         print("This method was actually called")
-        resultList = []
-        for submission in method(limit=count):
-            result = f"{submission.title} : {submission.url}"
-            print(result)
-            resultList.append(result)
+        resultList = [f"{submission.title} : {submission.url}" for submission in method(limit=count)]
+        print(resultList)
         return resultList
 
     def getCleanGameDealsFunc(self, method):
