@@ -1,4 +1,4 @@
-import discord, json, logging, praw, asyncio, datetime
+import discord, json, logging, praw, datetime
 
 tokenJson = open('../tokens.json')
 tokenData = json.load(tokenJson)
@@ -14,26 +14,27 @@ class hunter(discord.Client):
                                   client_secret=rClientSecret,
                                   user_agent=rUserAgent)
 
-    def cleanGameDeals(self, count, method):
+    def __init__(self, *, intents, **options) -> None:
+        super().__init__(intents=intents, **options)
+        sub: praw.models.SubredditHelper = self.dealFinder.subreddit("GameDeals")
+        self.commandToCall = {
+            "!hotdeals": self._get_game_deals_func(sub.hot),
+            "!risingdeals": self._get_game_deals_func(sub.rising),
+            "!topdeals": self._get_game_deals_func(sub.top),
+            "!controversialdeals": self._get_game_deals_func(sub.controversial)
+        }
+
+    def _get_game_deals(self, count: int, method) -> list[str]:
         print("This method was actually called")
         resultList = [f"{submission.title} : {submission.url}" for submission in method(limit=count)]
         print(resultList)
         return resultList
 
-    def getCleanGameDealsFunc(self, method):
-        return lambda count : self.cleanGameDeals(count, method)
+    def _get_game_deals_func(self, method):
+        return lambda count : self._get_game_deals(count, method)
 
-    async def createMap(self): 
-        sub = self.dealFinder.subreddit("GameDeals")
-        self.commandToCall = {
-            "!hotdeals": self.getCleanGameDealsFunc(sub.hot),
-            "!risingdeals": self.getCleanGameDealsFunc(sub.rising),
-            "!topdeals": self.getCleanGameDealsFunc(sub.top),
-            "!controversialdeals": self.getCleanGameDealsFunc(sub.controversial)
-        }
-    
-    # def getFunction(self):
-    #     lambda count : self.cleanGameDeals(count, sub.hot)
+    def is_valid_action(self, action: str):
+        return action in self.commandToCall.keys()
 
     async def on_ready(self):
         channel = self.get_channel(1012892793582129213)
@@ -42,12 +43,13 @@ class hunter(discord.Client):
 
 
     async def on_message(self, message):
-        if message.content not in self.commandToCall:
+        raw_message: str = message.content
+        if not self.is_valid_action(raw_message):
             return
 
-        result = self.commandToCall[message.content](5)
+        result: list[str] = self.commandToCall[message.content](5)
 
-        for post in result:
+        for post in result: #type: str
             await message.channel.send(post)
 
 
@@ -56,7 +58,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 client = hunter(intents=intents)
-asyncio.run(client.createMap())
 client.run(discordToken, log_handler=discordHandler)
 
 
