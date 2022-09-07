@@ -8,7 +8,7 @@ rClientId = tokenData['reddit']['client_id']
 rClientSecret = tokenData['reddit']['client_secret']
 rUserAgent = tokenData['reddit']['user_agent']
 
-class discord_listner(discord.Client):
+class discord_listener(discord.Client):
 
     rClient = None
 
@@ -70,7 +70,7 @@ discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8',
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord_listner(intents=intents)
+client = discord_listener(intents=intents)
 client.run(discordToken, log_handler=discordHandler)
 
 
