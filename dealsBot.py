@@ -1,5 +1,5 @@
 from queue import Empty
-import discord, json, logging, praw, datetime
+import discord, json, logging, praw
 
 tokenJson = open('../tokens.json')
 tokenData = json.load(tokenJson)
@@ -13,30 +13,46 @@ class discord_listener(discord.Client):
     rClient = None
 
     async def on_ready(self):
-        channel = self.get_channel(1012892793582129213)
-        #await channel.send("!hotdeals")
-        #await channel.send(datetime.datetime.now())
         self.rClient = reddit_hunter("GameDeals")
-        await channel.send("Please note the default subreddit is Game Deals. To set a new subreddit please use !select<subreddit_name>")
 
     async def on_message(self, message):
         raw_message: str = message.content
 
+        if raw_message == "!helpDealzBot" or raw_message.startswith("!help"):
+            await message.channel.send("Please note the default subreddit is Game Deals. To set a new subreddit please use !select<subreddit_name>.")
+
+        if raw_message == "!currentsub":
+            await message.channel.send(f"r/{self.rClient.subreddit}")
+
         if raw_message.startswith("!select"):
             self._set_rClient(raw_message.split("!select", 1)[1])
+           
+        
+        command = None
+        count = 5
 
-        if not self.rClient.is_valid_action(raw_message):
+        if raw_message[0] == "!" and raw_message[1].isdigit():
+            command = raw_message[:1] + raw_message[2:]
+            count = int(raw_message[1])
+        else:
+            command: str = raw_message
+
+        if not self.rClient.is_valid_action(command):
             return
-
-        result: list[str] = self.rClient.commandToCall[message.content](5)
+        
+        try:
+            result: list[str] = self.rClient.commandToCall[command](count)
+        except:
+            await message.channel.send(f"Please check that r/{self.rClient.subreddit} is spelled correctly and exists. Set again with !select")
 
         for post in result: #type: str
             await message.channel.send(post)
     
     def _set_rClient(self, subreddit):
         self.rClient = reddit_hunter(subreddit)
+        
 
-# Reddit client to decouple deal-hunting logic (WIP)
+# Reddit client to decouple deal-hunting logic
 class reddit_hunter:
 
     dealFinder = praw.Reddit(client_id=rClientId,
@@ -44,8 +60,11 @@ class reddit_hunter:
                                   user_agent=rUserAgent)
     commandToCall = None
 
+    subreddit = None
+
     def __init__(self, subreddit):
-        sub: praw.models.SubredditHelper = self.dealFinder.subreddit(subreddit)
+        self.subreddit = subreddit
+        sub: praw.models.Subreddit = self.dealFinder.subreddit(subreddit)
         self.commandToCall = {
             "!hotdeals": self._get_game_deals_func(sub.hot),
             "!risingdeals": self._get_game_deals_func(sub.rising),
@@ -54,9 +73,7 @@ class reddit_hunter:
         }
 
     def _get_game_deals(self, count: int, method) -> list[str]:
-        #print("This method was actually called")
         resultList = [f"{submission.title} : {submission.url}" for submission in method(limit=count)]
-        #print(resultList)
         return resultList
 
     def _get_game_deals_func(self, method):
@@ -70,8 +87,6 @@ discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8',
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord_listener(intents=intents)
+activity = discord.Activity(name='for them dealz', type=discord.ActivityType.watching)
+client = discord_listener(intents=intents, activity=activity)
 client.run(discordToken, log_handler=discordHandler)
-
-
-
