@@ -69,9 +69,7 @@ class reddit_commands(commands.Cog):
     async def show(self, ctx, *args):
         channel: str = ctx.channel
         sub = self.rClient.add_or_get_sub(ctx.channel, '')
-        print(args)
         arguments = ' '.join(args)
-        print(arguments)
         try:
             if args[0].isdigit():
                 result: list[str] = sub.commandToCall[args[1]](int(args[0]))
