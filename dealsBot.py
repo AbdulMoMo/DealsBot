@@ -1,12 +1,10 @@
 from discord.ext import commands
-import discord, json, logging, praw, asyncio
+import discord, logging, praw, asyncio, os
 
-tokenJson = open('../tokens.json')
-tokenData = json.load(tokenJson)
-discordToken = tokenData['discord']
-rClientId = tokenData['reddit']['client_id']
-rClientSecret = tokenData['reddit']['client_secret']
-rUserAgent = tokenData['reddit']['user_agent']    
+discordToken = os.environ.get('DISCORD_TOKEN')
+rClientId = os.environ.get('R_CLIENT_ID')
+rClientSecret = os.environ.get('R_CLIENT_SECRET')
+rUserAgent = os.environ.get('R_USER_AGENT')
 
 # Reddit client to decouple deal-hunting logic
 class reddit_hunter:
