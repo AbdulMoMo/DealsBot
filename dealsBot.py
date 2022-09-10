@@ -1,5 +1,5 @@
-from queue import Empty
-from discord.ext import tasks, commands
+# from queue import Empty
+from discord.ext import commands
 import discord, json, logging, praw, asyncio
 
 tokenJson = open('../tokens.json')
@@ -19,12 +19,10 @@ class reddit_hunter:
     def __init__(self) -> None:
         self.channelToSub = {}
 
-    def add_or_get_sub(self, channel, subreddit, isShow):
+    def add_or_get_sub(self, channel, subreddit):
         if subreddit != '':
             self.channelToSub[channel] = self.subreddit_hunter(subreddit, self.dealFinder)
-        elif not isShow:
-            self.channelToSub[channel] = self.subreddit_hunter('GameDeals', self.dealFinder) 
-        return self.channelToSub[channel]
+        return self.channelToSub.setdefault(channel, self.subreddit_hunter('GameDeals', self.dealFinder))
 
     class subreddit_hunter():
 
@@ -49,7 +47,7 @@ class reddit_hunter:
             return action in self.commandToCall.keys()
 
 
-
+#Cog for commands that require interaction with reddit_hunter
 class reddit_commands(commands.Cog):
     
     rClient = reddit_hunter()
@@ -57,31 +55,33 @@ class reddit_commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def _set_or_get_rClient(self, channel, subreddit, isShow):
-        return self.rClient.add_or_get_sub(channel, subreddit, isShow)
-    
     @commands.command()
     async def currentsub(self, ctx):
         channel: str = ctx.channel
-        await ctx.send(f"r/{self.rClient.add_or_get_sub(channel, '', False).subreddit}")
+        await ctx.send(f"r/{self.rClient.add_or_get_sub(channel, '').subreddit}")
 
     @commands.command()
     async def select(self, ctx, arg):
         channel: str = ctx.channel
-        self._set_or_get_rClient(channel, arg, False)
+        self.rClient.add_or_get_sub(channel, arg)
         await ctx.send(f" The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
-    
+
     @commands.command()
-    async def show(self, ctx, type):
+    async def show(self, ctx, *args):
         channel: str = ctx.channel
-        sub = self._set_or_get_rClient(ctx.channel, '', True)
+        sub = self.rClient.add_or_get_sub(ctx.channel, '')
+        print(args)
+        arguments = ' '.join(args)
+        print(arguments)
         try:
-            result: list[str] = sub.commandToCall[type](5)
-            # print(result)
+            if args[0].isdigit():
+                result: list[str] = sub.commandToCall[args[1]](int(args[0]))
+            else:
+                result: list[str] = sub.commandToCall[args[0]](5)     
             for post in result: #type: str
                 await ctx.send(post)
         except:
-            await ctx.send(f"Please check that r/{self.rClient.channelToSub[channel].subreddit} is spelled correctly and exists. Set again with $select")
+            await ctx.send(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
 
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -94,6 +94,10 @@ bot.remove_command('help')
 @bot.command()
 async def help(ctx):
     await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use !select<subreddit_name>.")
+
+@bot.command()
+async def hello(ctx):
+    await ctx.reply(f"Are ya ready for some deals {ctx.author}?")
 
 async def add_cog(bot, cog):
     await bot.add_cog(cog)
