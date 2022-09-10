@@ -1,4 +1,3 @@
-# from queue import Empty
 from discord.ext import commands
 import discord, json, logging, praw, asyncio
 
