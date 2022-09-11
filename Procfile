@@ -1,1 +1,1 @@
-worker: python dealsBot.py & heroku ps:scale worker=1
+worker: python dealsBot.py
