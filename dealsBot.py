@@ -92,6 +92,7 @@ bot.remove_command('help')
 async def help(ctx):
     await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use $show <subreddit_name> or $show <count of posts> <subreddit_name>")
 
+
 @bot.command()
 async def hello(ctx):
     await ctx.reply(f"Are ya ready for some deals {ctx.author}?")
