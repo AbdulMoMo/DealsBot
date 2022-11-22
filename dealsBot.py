@@ -68,8 +68,7 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def show(self, ctx, *args):
         channel: str = ctx.channel
-        sub = self.rClient.add_or_get_sub(ctx.channel, '')
-        arguments = ' '.join(args)
+        sub = self.rClient.add_or_get_sub(channel, '')
         try:
             if args[0].isdigit():
                 result: list[str] = sub.commandToCall[args[1]](int(args[0]))
@@ -79,6 +78,11 @@ class reddit_commands(commands.Cog):
                 await ctx.send(post)
         except:
             await ctx.send(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
+    
+    @commands.command()
+    async def search(self, ctx, *args):
+        channel: str = ctx.channel
+        sub = self.rClient.add_or_get-sub(channel, args[0])
 
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
@@ -90,7 +94,7 @@ bot.remove_command('help')
 
 @bot.command()
 async def help(ctx):
-    await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use $show <subreddit_name> or $show <count of posts> <subreddit_name>")
+    await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use $select <subreddit_name> or $show <hotdeals|risingdeals|topdeals|controversialdeals>")
 
 
 @bot.command()
