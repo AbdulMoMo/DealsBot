@@ -29,7 +29,12 @@ class reddit_hunter:
             submission = self.dealFinder.submission(id=id)
         except:
             traceback.print_exc()
-        return submission.upvote_ratio
+        return f'''- Title: {str(submission.title)}
+                   - Post Link: https://www.reddit.com{str(submission.permalink)}
+                   - Upvote Ratio : {str(submission.upvote_ratio * 100)}%
+                   - Flair : {str(submission.link_flair_text)}
+                   - OP: {str(submission.author)}
+                   - Total Awards: {str(submission.total_awards_received)}'''
 
     class subreddit_hunter():
 
@@ -76,19 +81,22 @@ class reddit_commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # Idea to expand post information with a question mark
+    # Bot doesn't seem to have access to messages in the channel before it was
+    # instanatiated. That means the internal message cache is only valid for n messages,
+    # up to 1000, from the point in time the discord client was successfully
+    # connected to. 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
-        questionSeq = '\u2753'
+        questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
         # Thought I was being smart here but unicode-escape comparison against
         # reaction.emoji works so this was scuttled.
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
         # Check for emoji equality then query for post to get breakdown insights
-        if questionSeq == reaction.emoji:
+        if reaction.emoji in questionSeqs:
             id = re.search(r"\[([A-Za-z0-9_]+)\]", reaction.message.content)
             result = self.rClient.get_post_details_from_id(id.group(1))
             channel = reaction.message.channel
-            await channel.send(f"{result*100}% Upvote Ratio")
+            await channel.send(result)
 
 
     @commands.command()
