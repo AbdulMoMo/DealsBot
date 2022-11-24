@@ -1,5 +1,5 @@
 from discord.ext import commands
-import discord, json, logging, praw, asyncio
+import discord, json, logging, praw, asyncio, pprint, traceback, re
 
 tokenJson = open('../tokens.json')
 tokenData = json.load(tokenJson)
@@ -23,6 +23,14 @@ class reddit_hunter:
             self.channelToSub[channel] = self.subreddit_hunter(subreddit, self.dealFinder)
         return self.channelToSub.setdefault(channel, self.subreddit_hunter('GameDeals', self.dealFinder))
 
+    def get_post_details_from_id(self, id: str) -> str:
+        print(f"This was called. Id input was {id}")
+        try: 
+            submission = self.dealFinder.submission(id=id)
+        except:
+            traceback.print_exc()
+        return submission.upvote_ratio
+
     class subreddit_hunter():
 
         def __init__(self, subreddit, dealFinder) -> None:
@@ -36,7 +44,15 @@ class reddit_hunter:
             }
 
         def _get_game_deals(self, count: int, method) -> list[str]:
-            resultList = [f"{submission.title} : {submission.url}" for submission in method(limit=count)]
+            resultList : list[str] = [f"[{submission.id}]{submission.title} : https://www.reddit.com{submission.permalink}" 
+                                        for submission in method(limit=count)]
+            # To check for available attributes of the submission object 
+            # try: 
+            #     oneSub = [submission for submission in method(limit=1)]
+            #     testSub = oneSub[0]
+            #     pprint.pprint(vars(testSub))
+            # except: 
+            #     traceback.print_exc()
             return resultList
 
         def _get_game_deals_func(self, method):
@@ -44,6 +60,12 @@ class reddit_hunter:
 
         def is_valid_action(self, action: str):
             return action in self.commandToCall.keys()
+
+        # TODO : Search method to build 
+        def search_sub(self, query: str, time: str): 
+            sub.search(query=query, time_filter=time)
+
+
 
 
 #Cog for commands that require interaction with reddit_hunter
@@ -53,6 +75,21 @@ class reddit_commands(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+
+    # Idea to expand post information with a question mark
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        questionSeq = '\u2753'
+        # Thought I was being smart here but unicode-escape comparison against
+        # reaction.emoji works so this was scuttled.
+        # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
+        # Check for emoji equality then query for post to get breakdown insights
+        if questionSeq == reaction.emoji:
+            id = re.search(r"\[([A-Za-z0-9_]+)\]", reaction.message.content)
+            result = self.rClient.get_post_details_from_id(id.group(1))
+            channel = reaction.message.channel
+            await channel.send(f"{result*100}% Upvote Ratio")
+
 
     @commands.command()
     async def currentsub(self, ctx):
@@ -95,7 +132,6 @@ bot.remove_command('help')
 @bot.command()
 async def help(ctx):
     await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use $select <subreddit_name> or $show <hotdeals|risingdeals|topdeals|controversialdeals>")
-
 
 @bot.command()
 async def hello(ctx):
