@@ -102,13 +102,13 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def currentsub(self, ctx):
         channel: str = ctx.channel
-        await ctx.send(f"r/{self.rClient.add_or_get_sub(channel, '').subreddit}")
+        await ctx.reply(f"r/{self.rClient.add_or_get_sub(channel, '').subreddit}")
 
     @commands.command()
     async def select(self, ctx, arg):
         channel: str = ctx.channel
         self.rClient.add_or_get_sub(channel, arg)
-        await ctx.send(f" The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
+        await ctx.reply(f" The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
     @commands.command()
     async def show(self, ctx, *args):
@@ -119,10 +119,19 @@ class reddit_commands(commands.Cog):
                 result: list[str] = sub.commandToCall[args[1]](int(args[0]))
             else:
                 result: list[str] = sub.commandToCall[args[0]](5)     
+            await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result: #type: str
-                await ctx.send(post)
+                titleUrl= post.split(' : ')
+                print(titleUrl)
+                # This works but breaks the question mark reaction feature
+                embed = discord.Embed(
+                    color = discord.Colour.dark_magenta()
+                )
+                embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
+                await ctx.send(embed=embed)
         except:
-            await ctx.send(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
+            await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
+            traceback.print_exc()
     
     @commands.command()
     async def search(self, ctx, *args):
