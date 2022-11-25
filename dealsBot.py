@@ -35,12 +35,18 @@ class reddit_hunter:
         except:
             traceback.print_exc()
         # To embed the post link, maybe want to send this back as a dict
-        return f'''- Title: {str(submission.title)}
-                   - Post Link: https://www.reddit.com{str(submission.permalink)}
-                   - Upvote Ratio : {str(submission.upvote_ratio * 100)}%
-                   - Flair : {str(submission.link_flair_text)}
-                   - OP: {str(submission.author)}
-                   - Total Awards: {str(submission.total_awards_received)}'''
+        # return f'''- Title: {str(submission.title)}
+        #     - Spoiler: {str(submission.spoiler)}
+        #     - Upvote Ratio : {str(submission.upvote_ratio * 100)}%
+        #     - Flair : {str(submission.link_flair_text)}
+        #     - OP: {str(submission.author)}
+        #     - Total Awards: {str(submission.total_awards_received)}'''
+        return {'Title': f'{str(submission.title)}', 
+                'Spoiler': f'{str(submission.spoiler)}',
+                'Upvote Ratio': f'{str(submission.upvote_ratio * 100)}%', 
+                'Flair': f'{str(submission.link_flair_text)}',
+                'OP': f'{str(submission.author)}', 
+                'Total Awards': f'{str(submission.total_awards_received)}'}
 
     class subreddit_hunter():
 
@@ -93,7 +99,6 @@ class reddit_commands(commands.Cog):
     # connected to. 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
-        print("ive been called")
         questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
         channel = reaction.message.channel
         result = '''Sorry! I could not pull this post's details from Reddit!
@@ -103,13 +108,24 @@ class reddit_commands(commands.Cog):
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
         # Check for emoji equality then query for post to get breakdown insights
         if reaction.message.embeds:
-            em = reaction.message.embeds[0].description
-            print(em)
+            em = reaction.message.embeds[0]
             if reaction.emoji in questionSeqs:
-                id = re.search(r"\[([A-Za-z0-9_]+)\]", em)
-                print(id)
-                result = self.rClient.get_post_details_from_id(id.group(1))
-        await channel.send(result)
+                id = re.search(r"\[([A-Za-z0-9_]+)\]", em.title).group(1)
+                result = self.rClient.get_post_details_from_id(id)
+                embed=discord.Embed(
+                    title=f"{embed.title}",
+                    url=f"{embed.url}",
+                    description="Some info about the post in a fancy format",
+                    color=discord.Color.blurple())
+                embed.add_field(name="**Title**", value=f"{result['Title']}", inline=False)
+                embed.add_field(name="**Spolier**", value=f"{result['Spoiler']}", inline=False)
+                embed.add_field(name="**Upvote Ratio**", value=f"{result['Upvote Ratio']}", inline=False)
+                embed.add_field(name="**Flair**", value=f"{result['Flair']}", inline=False)
+                embed.add_field(name="**OP**", value=f"{result['OP']}", inline=False)
+                embed.add_field(name="**Total Awards**", value=f"{result['Total Awards']}", inline=False)
+                await reaction.message.reply(embed=embed)
+                return
+        await reaction.message.reply(result)
 
 
     @commands.command()
@@ -135,11 +151,14 @@ class reddit_commands(commands.Cog):
             await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result: #type: str
                 titleUrl= post.split(' : ')
-                # This works but breaks the question mark reaction feature
+                # New problem here is that if title is > 256, Discord throws
+                # Invalid form title
                 embed = discord.Embed(
-                    color = discord.Colour.dark_magenta()
+                    color = discord.Colour.dark_magenta(),
+                    title=f'{titleUrl[0]}',
+                    url=f'{titleUrl[1]}'
                 )
-                embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
+                #embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
                 await ctx.send(embed=embed)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
