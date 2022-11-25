@@ -32,8 +32,12 @@ class reddit_hunter:
     def get_post_details_from_id(self, id: str) -> str:
         try: 
             submission = self.dealFinder.submission(id=id)
+            # To get available attributes of a submission,
+            # see https://praw.readthedocs.io/en/latest/getting_started/quick_start.html#determine-available-attributes-of-an-object
+            # pprint.pprint(vars(submission))
         except:
             traceback.print_exc()
+            return None
         return {'Title': f'{str(submission.title)}', 
                 'Spoiler': f'{str(submission.spoiler)}',
                 'Upvote Ratio': f'{str(submission.upvote_ratio * 100)}%', 
@@ -54,16 +58,9 @@ class reddit_hunter:
             }
 
         def _get_game_deals(self, count: int, method) -> list[str]:
-            resultList : list[str] = [f"[{submission.id}]{submission.title} : https://www.reddit.com{submission.permalink}" 
-                                        for submission in method(limit=count)]
-            # To check for available attributes of the submission object 
-            # try: 
-            #     oneSub = [submission for submission in method(limit=1)]
-            #     testSub = oneSub[0]
-            #     pprint.pprint(vars(testSub))
-            # except: 
-            #     traceback.print_exc()
-            return resultList
+            result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
+                        for submission in method(limit=count)]
+            return dict(result)
 
         def _get_game_deals_func(self, method):
             return lambda count : self._get_game_deals(count, method)
@@ -86,38 +83,34 @@ class reddit_commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # Bot doesn't seem to have access to messages in the channel before it was
+    # Client doesn't have to have access to messages in the channel before it was
     # instanatiated. That means the internal message cache is only valid for n messages,
-    # up to 1000, from the point in time the discord client was successfully
-    # connected to. 
+    # up to 1000, from the point in time the discord client was up. 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
+        # Used below statement to get unicode escape sequence for question mark
+        # emojis.
+        # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
         questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
         channel = reaction.message.channel
         result = '''Sorry! I could not pull this post's details from Reddit!
                     Try again or give up! :)'''
-        # Thought I was being smart here but unicode-escape comparison against
-        # reaction.emoji works so this was scuttled.
-        # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
         # Check for emoji equality then query for post to get breakdown insights
         if reaction.message.embeds:
             em = reaction.message.embeds[0]
             if reaction.emoji in questionSeqs:
-                id = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
-                result = self.rClient.get_post_details_from_id(id)
-                embed=discord.Embed(
-                    title="Click for post here",
-                    url=f"{em.url}",
-                    description="Some info about the post in a fancy format",
-                    color=discord.Color.blurple())
-                embed.add_field(name="**Title**", value=f"{result['Title']}", inline=False)
-                embed.add_field(name="**Spolier**", value=f"{result['Spoiler']}", inline=False)
-                embed.add_field(name="**Upvote Ratio**", value=f"{result['Upvote Ratio']}", inline=False)
-                embed.add_field(name="**Flair**", value=f"{result['Flair']}", inline=False)
-                embed.add_field(name="**OP**", value=f"{result['OP']}", inline=False)
-                embed.add_field(name="**Total Awards**", value=f"{result['Total Awards']}", inline=False)
-                await reaction.message.reply(embed=embed)
-                return
+                id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
+                result : Dict[str, str] = self.rClient.get_post_details_from_id(id)
+                if result: 
+                    embed=discord.Embed(
+                        title="Click for post here",
+                        url=f"{em.url}",
+                        description="Some info about the post in a fancy format",
+                        color=discord.Color.blurple())
+                    for field in result.keys():
+                        embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
+                    await reaction.message.reply(embed=embed)
+                    return                    
         await reaction.message.reply(result)
 
 
@@ -138,20 +131,16 @@ class reddit_commands(commands.Cog):
         sub = self.rClient.add_or_get_sub(channel, '')
         try:
             if args[0].isdigit():
-                result: list[str] = sub.commandToCall[args[1]](int(args[0]))
+                result : Dict[str, str] = sub.commandToCall[args[1]](int(args[0]))
             else:
-                result: list[str] = sub.commandToCall[args[0]](5)     
+                result : Dict[str, str] = sub.commandToCall[args[0]](5)    
             await ctx.reply(f'r/{sub.subreddit} deals:')
-            for post in result: #type: str
-                titleUrl= post.split(' : ')
-                # New problem here is that if title is > 256, Discord throws
-                # Invalid form title
-                print(len(titleUrl[0]))
+            for post in result.keys():
                 embed = discord.Embed(
                     color = discord.Colour.dark_magenta(),
-                    url=f'{titleUrl[1]}'
+                    url=f'{result[post]}'
                 )
-                embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
+                embed.description = f'[{post}]({result[post]})'
                 await ctx.send(embed=embed)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
