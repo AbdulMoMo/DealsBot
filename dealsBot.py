@@ -34,13 +34,6 @@ class reddit_hunter:
             submission = self.dealFinder.submission(id=id)
         except:
             traceback.print_exc()
-        # To embed the post link, maybe want to send this back as a dict
-        # return f'''- Title: {str(submission.title)}
-        #     - Spoiler: {str(submission.spoiler)}
-        #     - Upvote Ratio : {str(submission.upvote_ratio * 100)}%
-        #     - Flair : {str(submission.link_flair_text)}
-        #     - OP: {str(submission.author)}
-        #     - Total Awards: {str(submission.total_awards_received)}'''
         return {'Title': f'{str(submission.title)}', 
                 'Spoiler': f'{str(submission.spoiler)}',
                 'Upvote Ratio': f'{str(submission.upvote_ratio * 100)}%', 
@@ -110,11 +103,11 @@ class reddit_commands(commands.Cog):
         if reaction.message.embeds:
             em = reaction.message.embeds[0]
             if reaction.emoji in questionSeqs:
-                id = re.search(r"\[([A-Za-z0-9_]+)\]", em.title).group(1)
+                id = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
                 result = self.rClient.get_post_details_from_id(id)
                 embed=discord.Embed(
-                    title=f"{embed.title}",
-                    url=f"{embed.url}",
+                    title="Click for post here",
+                    url=f"{em.url}",
                     description="Some info about the post in a fancy format",
                     color=discord.Color.blurple())
                 embed.add_field(name="**Title**", value=f"{result['Title']}", inline=False)
@@ -153,12 +146,12 @@ class reddit_commands(commands.Cog):
                 titleUrl= post.split(' : ')
                 # New problem here is that if title is > 256, Discord throws
                 # Invalid form title
+                print(len(titleUrl[0]))
                 embed = discord.Embed(
                     color = discord.Colour.dark_magenta(),
-                    title=f'{titleUrl[0]}',
                     url=f'{titleUrl[1]}'
                 )
-                #embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
+                embed.description = f'[{titleUrl[0]}]({titleUrl[1]})'
                 await ctx.send(embed=embed)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
