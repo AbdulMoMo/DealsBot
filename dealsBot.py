@@ -1,6 +1,12 @@
 from discord.ext import commands
 import discord, json, logging, praw, asyncio, pprint, traceback, re
 
+# logging.basicConfig(filename="botLogger.log",
+#                     format='%(asctime)s %(message)s',
+#                     filemode='w')
+# blogger = logging.getLogger()
+# blogger.setLevel(logging.DEBUG)
+
 tokenJson = open('../tokens.json')
 tokenData = json.load(tokenJson)
 discordToken = tokenData['discord']
@@ -24,11 +30,11 @@ class reddit_hunter:
         return self.channelToSub.setdefault(channel, self.subreddit_hunter('GameDeals', self.dealFinder))
 
     def get_post_details_from_id(self, id: str) -> str:
-        print(f"This was called. Id input was {id}")
         try: 
             submission = self.dealFinder.submission(id=id)
         except:
             traceback.print_exc()
+        # To embed the post link, maybe want to send this back as a dict
         return f'''- Title: {str(submission.title)}
                    - Post Link: https://www.reddit.com{str(submission.permalink)}
                    - Upvote Ratio : {str(submission.upvote_ratio * 100)}%
@@ -87,16 +93,23 @@ class reddit_commands(commands.Cog):
     # connected to. 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
+        print("ive been called")
         questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
+        channel = reaction.message.channel
+        result = '''Sorry! I could not pull this post's details from Reddit!
+                    Try again or give up! :)'''
         # Thought I was being smart here but unicode-escape comparison against
         # reaction.emoji works so this was scuttled.
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
         # Check for emoji equality then query for post to get breakdown insights
-        if reaction.emoji in questionSeqs:
-            id = re.search(r"\[([A-Za-z0-9_]+)\]", reaction.message.content)
-            result = self.rClient.get_post_details_from_id(id.group(1))
-            channel = reaction.message.channel
-            await channel.send(result)
+        if reaction.message.embeds:
+            em = reaction.message.embeds[0].description
+            print(em)
+            if reaction.emoji in questionSeqs:
+                id = re.search(r"\[([A-Za-z0-9_]+)\]", em)
+                print(id)
+                result = self.rClient.get_post_details_from_id(id.group(1))
+        await channel.send(result)
 
 
     @commands.command()
@@ -122,7 +135,6 @@ class reddit_commands(commands.Cog):
             await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result: #type: str
                 titleUrl= post.split(' : ')
-                print(titleUrl)
                 # This works but breaks the question mark reaction feature
                 embed = discord.Embed(
                     color = discord.Colour.dark_magenta()
