@@ -1,5 +1,6 @@
 from discord.ext import commands
 import discord, json, logging, praw, asyncio, pprint, traceback, re
+from datetime import datetime
 
 # logging.basicConfig(filename="botLogger.log",
 #                     format='%(asctime)s %(message)s',
@@ -38,26 +39,29 @@ class reddit_hunter:
         except:
             traceback.print_exc()
             return None
+        # Datetime conversion seems to slow down this func proc time
         return {'Title': f'{str(submission.title)}', 
                 'Spoiler': f'{str(submission.spoiler)}',
                 'Upvote Ratio': f'{str(submission.upvote_ratio * 100)}%', 
                 'Flair': f'{str(submission.link_flair_text)}',
                 'OP': f'{str(submission.author)}', 
-                'Total Awards': f'{str(submission.total_awards_received)}'}
+                'Total Awards': f'{str(submission.total_awards_received)}',
+                'Created on (UTC)': f'{str(datetime.fromtimestamp(submission.created))}'
+                }
 
     class subreddit_hunter():
 
         def __init__(self, subreddit, dealFinder) -> None:
             self.subreddit = subreddit
-            sub: praw.models.Subreddit = dealFinder.subreddit(subreddit)
+            self.sub: praw.models.Subreddit = dealFinder.subreddit(subreddit)
             self.commandToCall = {
-                "hotdeals": self._get_game_deals_func(sub.hot),
-                "risingdeals": self._get_game_deals_func(sub.rising),
-                "topdeals": self._get_game_deals_func(sub.top),
-                "controversialdeals": self._get_game_deals_func(sub.controversial)
+                "hotdeals": self._get_game_deals_func(self.sub.hot),
+                "risingdeals": self._get_game_deals_func(self.sub.rising),
+                "topdeals": self._get_game_deals_func(self.sub.top),
+                "controversialdeals": self._get_game_deals_func(self.sub.controversial)
             }
 
-        def _get_game_deals(self, count: int, method) -> list[str]:
+        def _get_game_deals(self, count: int, method) -> dict[str, str]:
             result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
                         for submission in method(limit=count)]
             return dict(result)
@@ -68,9 +72,16 @@ class reddit_hunter:
         def is_valid_action(self, action: str):
             return action in self.commandToCall.keys()
 
-        # TODO : Search method to build 
-        def search_sub(self, query: str, time: str): 
-            sub.search(query=query, time_filter=time)
+        # TODO : Want to see if I can factor this so it can follow call
+        # pattern for the dict/lambda invocation
+        def search_sub(self, time: str, query: str): 
+            try:
+                result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
+                        for submission in self.sub.search(query=query, time_filter=time, limit=5)]
+            except:
+                traceback.print_exc()
+            return dict(result)
+        
 
 
 
@@ -136,11 +147,7 @@ class reddit_commands(commands.Cog):
                 result : Dict[str, str] = sub.commandToCall[args[0]](5)    
             await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result.keys():
-                embed = discord.Embed(
-                    color = discord.Colour.dark_magenta(),
-                    url=f'{result[post]}'
-                )
-                embed.description = f'[{post}]({result[post]})'
+                embed = self._create_general_embed(post, result)
                 await ctx.send(embed=embed)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
@@ -149,7 +156,26 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def search(self, ctx, *args):
         channel: str = ctx.channel
-        sub = self.rClient.add_or_get-sub(channel, args[0])
+        sub = self.rClient.add_or_get_sub(channel, '')
+        if len(args) > 1:
+            result = sub.search_sub(args[0], args[1])
+        else:
+            result = sub.search_sub("day", args[0])
+        if result:
+            for post in result.keys():
+                embed = self._create_general_embed(post, result)
+                await ctx.reply(embed=embed)
+        else:
+            await ctx.reply("No results in this time range! Try a different one")
+
+    def _create_general_embed(self, post, result) -> discord.Embed:
+        embed = discord.Embed(
+            color = discord.Colour.dark_magenta(),
+            url=f'{result[post]}'
+        )
+        embed.description = f'[{post}]({result[post]})'
+        return embed
+
 
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
