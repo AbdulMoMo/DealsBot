@@ -19,8 +19,8 @@ rUserAgent = tokenData['reddit']['user_agent']
 class reddit_hunter:
 
     dealFinder = praw.Reddit(client_id=rClientId,
-                                  client_secret=rClientSecret,
-                                  user_agent=rUserAgent)
+                             client_secret=rClientSecret,
+                             user_agent=rUserAgent)
 
     def __init__(self) -> None:
         self.channelToSub = {}
@@ -113,13 +113,7 @@ class reddit_commands(commands.Cog):
                 id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
                 result : Dict[str, str] = self.rClient.get_post_details_from_id(id)
                 if result: 
-                    embed=discord.Embed(
-                        title="Click for post here",
-                        url=f"{em.url}",
-                        description="Some info about the post in a fancy format",
-                        color=discord.Color.blurple())
-                    for field in result.keys():
-                        embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
+                    embed = self._create_field_embed(result, "Deal Breakdown (Link)", em.url)
                     await reaction.message.reply(embed=embed)
                     return                    
         await reaction.message.reply(result)
@@ -170,10 +164,20 @@ class reddit_commands(commands.Cog):
 
     def _create_general_embed(self, post, result) -> discord.Embed:
         embed = discord.Embed(
-            color = discord.Colour.dark_magenta(),
+            color=discord.Colour.dark_magenta(),
             url=f'{result[post]}'
         )
         embed.description = f'[{post}]({result[post]})'
+        return embed
+    
+    def _create_field_embed(self, result, title, url) -> discord.Embed:
+        embed = discord.Embed(
+            color=discord.Colour.brand_green(),
+            title=title,
+            url=url
+        )
+        for field in result.keys():
+            embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
         return embed
 
 
