@@ -1,5 +1,12 @@
+import discord
 from discord.ext import commands
-import discord, json, logging, praw, asyncio, pprint, traceback, re
+import json
+import logging
+import praw
+import asyncio
+import pprint
+import traceback
+import re
 from datetime import datetime
 
 # logging.basicConfig(filename="botLogger.log",
@@ -8,6 +15,7 @@ from datetime import datetime
 # blogger = logging.getLogger()
 # blogger.setLevel(logging.DEBUG)
 
+# Storing API keys for Discord and Reddit 
 tokenJson = open('../tokens.json')
 tokenData = json.load(tokenJson)
 discordToken = tokenData['discord']
@@ -15,21 +23,34 @@ rClientId = tokenData['reddit']['client_id']
 rClientSecret = tokenData['reddit']['client_secret']
 rUserAgent = tokenData['reddit']['user_agent']    
 
-# Reddit client to decouple deal-hunting logic
+# Class to encapsulate interaction with the Reddit client (PRAW)
 class reddit_hunter:
 
+    # Reddit client object
     dealFinder = praw.Reddit(client_id=rClientId,
                              client_secret=rClientSecret,
                              user_agent=rUserAgent)
 
+    # Constructor for reddit_hunter
+    # Inputs: None
+    # Outputs: None
+    # Exceptions: None
     def __init__(self) -> None:
         self.channelToSub = {}
 
-    def add_or_get_sub(self, channel, subreddit):
+    # Function to pull a subreddit_hunter for the given discord channel
+    # Inputs: Channel (str) - Discord Channel Id, Subreddit (str) - Subreddit name
+    # Outputs: Subreddit Hunter (subreddit_hunter)
+    # Exceptions: None 
+    def add_or_get_sub(self, channel: str, subreddit: str):
         if subreddit != '':
             self.channelToSub[channel] = self.subreddit_hunter(subreddit, self.dealFinder)
         return self.channelToSub.setdefault(channel, self.subreddit_hunter('GameDeals', self.dealFinder))
 
+    # Function to provide detailed information on a specific Reddit submission 
+    # Inputs: id (str) for a reddit submission
+    # Outputs: Submission details (dict)
+    # Exceptions: None (an invalid id will return an empty result)
     def get_post_details_from_id(self, id: str) -> str:
         try: 
             submission = self.dealFinder.submission(id=id)
@@ -49,8 +70,13 @@ class reddit_hunter:
                 'Created on (UTC)': f'{str(datetime.fromtimestamp(submission.created))}'
                 }
 
+    # Child class to encpasulate specific subreddit operations
     class subreddit_hunter():
 
+        # Constructor for subreddit_hunter
+        # Inputs: subreddit (str), dealFinder (praw.Reddit)
+        # Outputs: None
+        # Excpetions: None
         def __init__(self, subreddit, dealFinder) -> None:
             self.subreddit = subreddit
             self.sub: praw.models.Subreddit = dealFinder.subreddit(subreddit)
@@ -61,17 +87,33 @@ class reddit_hunter:
                 "controversialdeals": self._get_game_deals_func(self.sub.controversial)
             }
 
+        # Function for creating refs of posts + post links
+        # Inputs: count (int) -- for # of results, method (praw.models.Subreddit)
+        # Outputs: result (dict) of posts + post links
+        # Exceptions: None
         def _get_game_deals(self, count: int, method) -> dict[str, str]:
             result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
                         for submission in method(limit=count)]
             return dict(result)
 
+        # Function to trigger _get_game_deals()
+        # Inputs: method (praw.models.Subreddit)
+        # Outputs: Invocation result of _get_game_deals
+        # Exceptions: None
         def _get_game_deals_func(self, method):
             return lambda count : self._get_game_deals(count, method)
 
+        # Function to check if input is a valid subreddit action 
+        # Inputs: action (str) - being checked
+        # Outputs: True/False (boolean)
+        # Excpetions: None 
         def is_valid_action(self, action: str):
             return action in self.commandToCall.keys()
 
+        # Function to search a subreddit based on a given query + time range
+        # Inputs: time (str) - time range, query (str) - query to search 
+        # Outputs: Reference of posts + post links
+        # Exceptions: TBD
         # TODO : Want to see if I can factor this so it can follow call
         # pattern for the dict/lambda invocation
         def search_sub(self, time: str, query: str): 
@@ -86,15 +128,23 @@ class reddit_hunter:
 
 
 
-#Cog for commands that require interaction with reddit_hunter
+# Class to encapsulate discord bot commands that interact with the reddit client (as a child of a Cog for discord.ext)
 class reddit_commands(commands.Cog):
     
     rClient = reddit_hunter()
 
+    # Constructor to init reddit_commands
+    # Inputs: bot (discord.Ext.bot)
+    # Outputs: None 
+    # Exceptions None 
     def __init__(self, bot):
         self.bot = bot
 
-    # Client doesn't have to have access to messages in the channel before it was
+    # Function to trigger post breakdown msg when user reacts to a bot post
+    # Inputs: reaction (discord.Emoji), user (discord.User)
+    # Outputs: None
+    # Exceptions: None
+    # Note: Client doesn't have to have access to messages in the channel before it was
     # instanatiated. That means the internal message cache is only valid for n messages,
     # up to 1000, from the point in time the discord client was up. 
     @commands.Cog.listener()
@@ -118,18 +168,29 @@ class reddit_commands(commands.Cog):
                     return                    
         await reaction.message.reply(result)
 
-
+    # Function to reply to user with the current subreddit for a channel
+    # Inputs: ctx (discord.ext.commands.Context)
+    # Outputs: None
+    # Exceptions None
     @commands.command()
     async def currentsub(self, ctx):
         channel: str = ctx.channel
         await ctx.reply(f"r/{self.rClient.add_or_get_sub(channel, '').subreddit}")
 
+    # Function to select a subreddit for the discord channel
+    # Inputs: ctx (discord.ext.Commands.Context), arg (str) - command keyword argument
+    # Ouputs: None
+    # Exceptions: None
     @commands.command()
     async def select(self, ctx, arg):
         channel: str = ctx.channel
         self.rClient.add_or_get_sub(channel, arg)
-        await ctx.reply(f" The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
+        await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
+    # Function to pull post results based on top/hot/rising/controversial
+    # Inputs: ctx (discord.ext.Commands.Context), args (List[str])
+    # Outputs: None
+    # Exceptions TBD
     @commands.command()
     async def show(self, ctx, *args):
         channel: str = ctx.channel
@@ -147,6 +208,10 @@ class reddit_commands(commands.Cog):
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
             traceback.print_exc()
     
+    # Function to search a subreddit based on a query and time range
+    # Inputs: ctx (discord.ext.Commands.Context), args (List[str])
+    # Outputs: None
+    # Exceptions: None
     @commands.command()
     async def search(self, ctx, *args):
         channel: str = ctx.channel
@@ -162,6 +227,10 @@ class reddit_commands(commands.Cog):
         else:
             await ctx.reply("No results in this time range! Try a different one")
 
+    # Function to create a general discord embed for a bot message
+    # Inputs: post (str) - post title, result (dict) - varies
+    # Outputs: embed (discord.Embed)
+    # Exceptions: None
     def _create_general_embed(self, post, result) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.dark_magenta(),
@@ -169,36 +238,55 @@ class reddit_commands(commands.Cog):
         )
         embed.description = f'[{post}]({result[post]})'
         return embed
-    
-    def _create_field_embed(self, result, title, url) -> discord.Embed:
+
+    # Function to create a general discord embed for a bot message
+    # Inputs: post (str) - post title, result (dict) - varies
+    # Outputs: embed (discord.Embed)
+    # Exceptions: None
+    def _create_field_embed(self, result, post, url) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.brand_green(),
-            title=title,
+            title=post,
             url=url
         )
         for field in result.keys():
             embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
         return embed
 
-
+# Create discord longging handler and intents
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
 intents = discord.Intents.default()
 intents.message_content = True
 
+# set bot configuration and activity as well as remove default help to create custom help
 activity = discord.Activity(name='for them dealz', type=discord.ActivityType.watching)
 bot = commands.Bot(command_prefix='$', intents=intents, activity=activity)
 bot.remove_command('help')
 
+# Function to give help information
+# Inputs: ctx (discord.ext.Commands.Context)
+# Outputs: None
+# Exceptions: None
+# TODO: Make a proper help function within the reddit_commands class that replies to user with commands guide
 @bot.command()
 async def help(ctx):
-    await ctx.send("Please note the default subreddit is Game Deals. To set a new subreddit please use $select <subreddit_name> or $show <hotdeals|risingdeals|topdeals|controversialdeals>")
+    await ctx.reply("Please note the default subreddit is r/GameDeals. To set a new subreddit please use $select <subreddit_name> or $show <hotdeals|risingdeals|topdeals|controversialdeals>")
 
+# Function to say hello to user
+# Inputs: ctx (discord.ext.Commands.Context)
+# Outputs: None
+# Exceptions: None
 @bot.command()
 async def hello(ctx):
     await ctx.reply(f"Are ya ready for some deals {ctx.author}?")
 
+# Function to add cog to discord bot 
+# Inputs: bot (discord.Bot)
+# Outputs: None
+# Exceptions: None 
 async def add_cog(bot, cog):
     await bot.add_cog(cog)
 
+# Need asyncio to add cog 
 asyncio.run(add_cog(bot, reddit_commands(bot)))
 bot.run(discordToken, log_handler=discordHandler)
