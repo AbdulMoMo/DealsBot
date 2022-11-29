@@ -140,6 +140,41 @@ class reddit_commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    # Function to provide help information on reddit bot commands
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @commands.command()
+    async def reddithelp(self, ctx):
+        # Cursed formatting but this works. Need to fix
+        helpRef: dict[str, str] = {
+            "$select": '''To select a subreddit. This is set at the channel level. The default subreddit is r/GameDeals.
+                          Example usage: `$select buildapcsales`''',
+            "$show": '''For listing posts by hot/top/rising/controversial by n number of posts.
+                        Example usage: 
+                        ```
+                        $show topdeals 
+                        $show controversialdeals
+                        $show risingdeals
+                        $show hotdeals
+                        $show 4 hotdeals```
+                        *The default number of posts to be output is 5.
+                    ''',
+            "\u2753 or \u2754 or \u2049\ufe0f": '''React to one of DealzBot's messages with the above emojis to get additional
+                                                   information on the given reddit post.''',
+            "$search": '''For searching a subreddit based on a given time range and query.
+                        Valid time ranges are: 'all', 'day', 'hour', 'month', 'week' or 'year'. Default is 'all'
+                        Example usage: 
+                        ```
+                        $search week destiny 
+                        $search aoc
+                        $search hour minecraft```
+                        *The current (hard) limit for search results is 5.
+                    '''
+        }
+        embed = self._create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
+        await ctx.reply(embed=embed)
+
     # Function to trigger post breakdown msg when user reacts to a bot post
     # Inputs: reaction (discord.Emoji), user (discord.User)
     # Outputs: None
@@ -161,7 +196,7 @@ class reddit_commands(commands.Cog):
             em = reaction.message.embeds[0]
             if reaction.emoji in questionSeqs:
                 id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
-                result : Dict[str, str] = self.rClient.get_post_details_from_id(id)
+                result : dict[str, str] = self.rClient.get_post_details_from_id(id)
                 if result: 
                     embed = self._create_field_embed(result, "Deal Breakdown (Link)", em.url)
                     await reaction.message.reply(embed=embed)
@@ -197,9 +232,9 @@ class reddit_commands(commands.Cog):
         sub = self.rClient.add_or_get_sub(channel, '')
         try:
             if args[0].isdigit():
-                result : Dict[str, str] = sub.commandToCall[args[1]](int(args[0]))
+                result : dict[str, str] = sub.commandToCall[args[1]](int(args[0]))
             else:
-                result : Dict[str, str] = sub.commandToCall[args[0]](5)    
+                result : dict[str, str] = sub.commandToCall[args[0]](5)    
             await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result.keys():
                 embed = self._create_general_embed(post, result)
@@ -243,10 +278,10 @@ class reddit_commands(commands.Cog):
     # Inputs: post (str) - post title, result (dict) - varies
     # Outputs: embed (discord.Embed)
     # Exceptions: None
-    def _create_field_embed(self, result, post, url) -> discord.Embed:
+    def _create_field_embed(self, result, title, url) -> discord.Embed:
         embed = discord.Embed(
             color=discord.Colour.brand_green(),
-            title=post,
+            title=title,
             url=url
         )
         for field in result.keys():
@@ -270,7 +305,7 @@ bot.remove_command('help')
 # TODO: Make a proper help function within the reddit_commands class that replies to user with commands guide
 @bot.command()
 async def help(ctx):
-    await ctx.reply("Please note the default subreddit is r/GameDeals. To set a new subreddit please use $select <subreddit_name> or $show <hotdeals|risingdeals|topdeals|controversialdeals>")
+    await ctx.reply("Please note the default subreddit is r/GameDeals. For reddit specific commands, use `$reddithelp` to get more information!")
 
 # Function to say hello to user
 # Inputs: ctx (discord.ext.Commands.Context)
