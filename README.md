@@ -53,7 +53,7 @@ Usage Examples:
     - `Where n can be any positive number`
 
 Notes:
-- Negavtive numbers would not work for any of you anarchists out there
+- Negative numbers would not work for any of you anarchists out there
 
 ----
 
