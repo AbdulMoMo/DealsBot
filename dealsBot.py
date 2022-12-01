@@ -8,6 +8,7 @@ import pprint
 import traceback
 import re
 from datetime import datetime
+from prawcore import NotFound
 
 # logging.basicConfig(filename="botLogger.log",
 #                     format='%(asctime)s %(message)s',
@@ -37,6 +38,18 @@ class reddit_hunter:
     # Exceptions: None
     def __init__(self) -> None:
         self.channelToSub = {}
+
+    # Function to check if a subreddit exists before invoking add_or_get_sub
+    # Inputs: subreddit (str) to search for
+    # Outputs: True/False
+    # Exceptions: NotFound (expected when subreddit is not found)
+    def sub_exists(self, subreddit):
+        exists = True
+        try:
+            self.dealFinder.subreddits.search_by_name(subreddit, exact=True)
+        except NotFound:
+            exists = False
+        return exists
 
     # Function to pull a subreddit_hunter for the given discord channel
     # Inputs: Channel (str) - Discord Channel Id, Subreddit (str) - Subreddit name
@@ -79,7 +92,10 @@ class reddit_hunter:
         # Excpetions: None
         def __init__(self, subreddit, dealFinder) -> None:
             self.subreddit = subreddit
-            self.sub: praw.models.Subreddit = dealFinder.subreddit(subreddit)
+            try:
+                self.sub: praw.models.Subreddit = dealFinder.subreddit(subreddit)
+            except:
+                traceback.print_exc()
             self.commandToCall = {
                 "hotdeals": self._get_game_deals_func(self.sub.hot),
                 "risingdeals": self._get_game_deals_func(self.sub.rising),
@@ -92,8 +108,11 @@ class reddit_hunter:
         # Outputs: result (dict) of posts + post links
         # Exceptions: None
         def _get_game_deals(self, count: int, method) -> dict[str, str]:
-            result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
+            try: 
+                result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
                         for submission in method(limit=count)]
+            except: 
+                traceback.print_exc()
             return dict(result)
 
         # Function to trigger _get_game_deals()
@@ -132,6 +151,19 @@ class reddit_hunter:
 class reddit_commands(commands.Cog):
     
     rClient = reddit_hunter()
+
+    # Frozenset for O(1) lookup 
+    # Used this thread to create a foundational deny list: https://www.reddit.com/r/AskReddit/comments/6rjqmk/what_is_the_worst_subreddit_youve_come_across/
+    denyList =frozenset((
+        "gonewild",
+        "incels",
+        "truecels",
+        "poop",
+        "imgoingtohellforthis",
+        "selffuck",
+        "oldladiesbakingpies",
+        "letsnotmeet"
+    ))
 
     # Constructor to init reddit_commands
     # Inputs: bot (discord.Ext.bot)
@@ -219,8 +251,14 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def select(self, ctx, arg):
         channel: str = ctx.channel
-        self.rClient.add_or_get_sub(channel, arg)
-        await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
+        userInput: str = arg.lower()
+        if userInput in self.denyList:
+            await ctx.reply("NO.")
+        elif not self.rClient.sub_exists(userInput):
+            await ctx.reply('''Sorry! This subreddit does not exist! Or the author of this commit should git gud.''')
+        else:
+            self.rClient.add_or_get_sub(channel, arg)
+            await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
     # Function to pull post results based on top/hot/rising/controversial
     # Inputs: ctx (discord.ext.Commands.Context), args (List[str])
@@ -230,9 +268,14 @@ class reddit_commands(commands.Cog):
     async def show(self, ctx, *args):
         channel: str = ctx.channel
         sub = self.rClient.add_or_get_sub(channel, '')
+        # Questionable boolean zen below??? TODO: Review this conditional sequence
+        # for optimizations.
         try:
-            if args[0].isdigit():
+            if args[0].isdigit() and int(args[0]) <= 10:
                 result : dict[str, str] = sub.commandToCall[args[1]](int(args[0]))
+            elif args[0].isdigit() and int(args[0]) > 10:
+                await ctx.reply("Please pick an output amount <= 10!")
+                return
             else:
                 result : dict[str, str] = sub.commandToCall[args[0]](5)    
             await ctx.reply(f'r/{sub.subreddit} deals:')

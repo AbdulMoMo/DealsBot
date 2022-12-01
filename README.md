@@ -137,10 +137,10 @@ Below you can find a word vomit of my thought process when fleshing out these cl
 
 ## Known Issues
 
-- While you ***can*** (this might change in the future), define a high pagination limit for the `$show` commands, Discord will [rate limit](https://discord.com/developers/docs/topics/rate-limits) DealzBot 
-    - To stay on the safer side, I would recommend keeping the max count to 10
-        - I will likely update this in the future to prevent abuse of this flaw
+- ~~While you ***can*** (this might change in the future), define a high pagination limit for the `$show` commands, Discord will [rate limit](https://discord.com/developers/docs/topics/rate-limits) DealzBot~~
+    - 11/30/22 Update: To stay on the safer side, I've restricted the max output to 10
 - With certain `$show` invocations, I've found that the fifth result (when using the default of 5) takes slightly longer to be sent than the preceding four. Once I implement proper logging for DealzBot I'll look into why that's the case as, to my memory, this was not an issue in previous iterations of DealzBot (pre-embed message era)
+    - In testing with larger list amounts (>5), there is a delay in the submission results. I assume it's a limitation/feature of PRAW but have not researched enough on this yet
 ----
 
 ## Bug Reporting
