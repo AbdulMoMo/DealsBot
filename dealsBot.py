@@ -7,6 +7,8 @@ import asyncio
 import pprint
 import traceback
 import re
+import os 
+
 from datetime import datetime
 from prawcore import NotFound
 
@@ -17,12 +19,10 @@ from prawcore import NotFound
 # blogger.setLevel(logging.DEBUG)
 
 # Storing API keys for Discord and Reddit 
-tokenJson = open('../tokens.json')
-tokenData = json.load(tokenJson)
-discordToken = tokenData['discord']
-rClientId = tokenData['reddit']['client_id']
-rClientSecret = tokenData['reddit']['client_secret']
-rUserAgent = tokenData['reddit']['user_agent']    
+discordToken = os.environ.get('DISCORD_TOKEN')
+rClientId = os.environ.get('R_CLIENT_ID')
+rClientSecret = os.environ.get('R_CLIENT_SECRET')
+rUserAgent = os.environ.get('R_USER_AGENT')
 
 # Class to encapsulate interaction with the Reddit client (PRAW)
 class reddit_hunter:
@@ -47,6 +47,8 @@ class reddit_hunter:
         exists = True
         try:
             self.dealFinder.subreddits.search_by_name(subreddit, exact=True)
+            if self.dealFinder.subreddit(subreddit).over18:
+                return False
         except NotFound:
             exists = False
         return exists
@@ -69,6 +71,7 @@ class reddit_hunter:
             submission = self.dealFinder.submission(id=id)
             # To get available attributes of a submission,
             # see https://praw.readthedocs.io/en/latest/getting_started/quick_start.html#determine-available-attributes-of-an-object
+            # print(submission.title)
             # pprint.pprint(vars(submission))
         except:
             traceback.print_exc()
@@ -152,18 +155,14 @@ class reddit_commands(commands.Cog):
     
     rClient = reddit_hunter()
 
-    # Frozenset for O(1) lookup 
-    # Used this thread to create a foundational deny list: https://www.reddit.com/r/AskReddit/comments/6rjqmk/what_is_the_worst_subreddit_youve_come_across/
-    denyList =frozenset((
-        "gonewild",
-        "incels",
-        "truecels",
-        "poop",
-        "imgoingtohellforthis",
-        "selffuck",
-        "oldladiesbakingpies",
-        "letsnotmeet"
-    ))
+    # Allow list to reduce invocations of rClient.sub_exists()
+    allowList = {
+        "gamedeals",
+        "buildapcsales",
+        "games",
+        "hardwareswap",
+        "gamedealsmeta",
+    }
 
     # Constructor to init reddit_commands
     # Inputs: bot (discord.Ext.bot)
@@ -252,11 +251,11 @@ class reddit_commands(commands.Cog):
     async def select(self, ctx, arg):
         channel: str = ctx.channel
         userInput: str = arg.lower()
-        if userInput in self.denyList:
-            await ctx.reply("NO.")
-        elif not self.rClient.sub_exists(userInput):
-            await ctx.reply('''Sorry! This subreddit does not exist! Or the author of this commit should git gud.''')
+        if userInput not in self.allowList and not self.rClient.sub_exists(userInput):
+            await ctx.reply('''Sorry! Either the subreddit is marked as NSFW (Over 18) or it does not exist!''')
         else:
+            # Cache subreddit not already included in allowList to reduce rClient.sub_exists() calls
+            self.allowList.add(userInput)
             self.rClient.add_or_get_sub(channel, arg)
             await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
