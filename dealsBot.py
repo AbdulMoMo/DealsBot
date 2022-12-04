@@ -164,6 +164,14 @@ class reddit_commands(commands.Cog):
         "gamedealsmeta",
     }
 
+    DEFAULT_COUNT = 5
+
+    UPPER_COUNT = 10
+
+    BOT_ID = 'DealzBot#1632'
+
+    questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
+
     # Constructor to init reddit_commands
     # Inputs: bot (discord.Ext.bot)
     # Outputs: None 
@@ -218,21 +226,26 @@ class reddit_commands(commands.Cog):
         # Used below statement to get unicode escape sequence for question mark
         # emojis.
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
-        questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
-        channel = reaction.message.channel
-        result = '''Sorry! I could not pull this post's details from Reddit!
-                    Try again or give up! :)'''
+
+        # Check if message is not from DealzBot
+        if str(reaction.message.author) != self.BOT_ID:
+            return
+
         # Check for emoji equality then query for post to get breakdown insights
         if reaction.message.embeds:
             em = reaction.message.embeds[0]
-            if reaction.emoji in questionSeqs:
+            if reaction.emoji in self.questionSeqs:
+                result = '''Sorry! I could not pull this post's details from Reddit!
+                    Try again or give up! :)'''
                 id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
                 result : dict[str, str] = self.rClient.get_post_details_from_id(id)
                 if result: 
                     embed = self._create_field_embed(result, "Deal Breakdown (Link)", em.url)
                     await reaction.message.reply(embed=embed)
                     return                    
-        await reaction.message.reply(result)
+                await reaction.message.reply(result)
+            else:
+                return
 
     # Function to reply to user with the current subreddit for a channel
     # Inputs: ctx (discord.ext.commands.Context)
@@ -270,13 +283,25 @@ class reddit_commands(commands.Cog):
         # Questionable boolean zen below??? TODO: Review this conditional sequence
         # for optimizations.
         try:
-            if args[0].isdigit() and int(args[0]) <= 10:
-                result : dict[str, str] = sub.commandToCall[args[1]](int(args[0]))
-            elif args[0].isdigit() and int(args[0]) > 10:
-                await ctx.reply("Please pick an output amount <= 10!")
+            # For show expect one or two args:
+            # $show 5 hotdeals
+            # $show hotdeals
+            # args[0] = number OR commandToCall value
+            # args[1] (if exists) = commandToCall value
+            countOrCommand: str = args[0]
+            isNumInput: bool = countOrCommand.isdigit()
+
+            # Should correspond to commandToCall value
+            if len(args) > 1:
+                subFilter = args[1]
+
+            if isNumInput and int(countOrCommand) <= self.UPPER_COUNT:
+                result : dict[str, str] = sub.commandToCall[subFilter](int(countOrCommand))
+            elif isNumInput and int(countOrCommand) > self.UPPER_COUNT:
+                await ctx.reply(f"Please pick an output amount <= {self.UPPER_COUNT}!")
                 return
             else:
-                result : dict[str, str] = sub.commandToCall[args[0]](5)    
+                result : dict[str, str] = sub.commandToCall[countOrCommand](self.DEFAULT_COUNT)    
             await ctx.reply(f'r/{sub.subreddit} deals:')
             for post in result.keys():
                 embed = self._create_general_embed(post, result)
