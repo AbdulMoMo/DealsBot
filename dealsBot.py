@@ -5,6 +5,7 @@ import asyncio
 import traceback
 import re
 import os 
+import pprint
 
 import redditClientImpl
 
@@ -30,6 +31,8 @@ class reddit_commands(commands.Cog):
     UPPER_COUNT = 10
 
     BOT_ID = 'DealzBot#1632'
+
+    THREAD_ARCHIVE_DURATION = 60
 
     questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
 
@@ -162,11 +165,13 @@ class reddit_commands(commands.Cog):
                 await ctx.reply(f"Please pick an output amount <= {self.UPPER_COUNT}!")
                 return
             else:
-                result : dict[str, str] = sub.commandToCall[countOrCommand](self.DEFAULT_COUNT)    
-            await ctx.reply(f'r/{sub.subreddit} deals:')
-            for post in result.keys():
-                embed = self._create_general_embed(post, result)
-                await ctx.send(embed=embed)
+                result : dict[str, str] = sub.commandToCall[countOrCommand](self.DEFAULT_COUNT)
+            # Relic before thread, holding here for now in case there is a breaking change with threads I missed    
+            # await ctx.reply(f'r/{sub.subreddit} deals:')
+            # for post in result.keys():
+            #     embed = self._create_general_embed(post, result)
+            #     await ctx.send(embed=embed)
+            await self._make_deals_thread(result, ctx.message, sub)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
             traceback.print_exc()
@@ -184,9 +189,7 @@ class reddit_commands(commands.Cog):
         else:
             result = sub.search_sub("day", args[0])
         if result:
-            for post in result.keys():
-                embed = self._create_general_embed(post, result)
-                await ctx.reply(embed=embed)
+            await self._make_deals_thread(result, ctx.message, sub)
         else:
             await ctx.reply("No results in this time range! Try a different one")
 
@@ -215,6 +218,20 @@ class reddit_commands(commands.Cog):
         for field in result.keys():
             embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
         return embed
+
+    # Function to create thread (ex. $search and $show) for reddit deals
+    # Inputs: result - dict[str, str], message - discord.Message, sub - redditClientImpl.reddit_hunter.subreddit_hunter
+    # Outputs: None
+    # Exceptions: None
+    async def _make_deals_thread(self, result: dict[str, str], message: discord.Message, sub: redditClientImpl.reddit_hunter.subreddit_hunter):
+        try: 
+            dealsThread = await message.create_thread(name=f'{sub.subreddit} Deals:', auto_archive_duration=self.THREAD_ARCHIVE_DURATION)
+        except discord.HTTPException: 
+            # Could not create thread in this case. TODO: when I add logging need to emit error here
+            return
+        for post in result.keys():
+            embed = self._create_general_embed(post, result)
+            await dealsThread.send(embed=embed)
 
 # Create discord longging handler and intents
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
