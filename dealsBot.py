@@ -18,7 +18,7 @@ class reddit_commands(commands.Cog):
     rClient = redditClientImpl.reddit_hunter()
 
     # Allow list to reduce invocations of rClient.sub_exists()
-    allowList = {
+    ALLOW_LIST = {
         "gamedeals",
         "buildapcsales",
         "games",
@@ -34,7 +34,9 @@ class reddit_commands(commands.Cog):
 
     THREAD_ARCHIVE_DURATION = 60
 
-    questionSeqs = {'\u2753', '\u2754', '\u2049\ufe0f'}
+    # Possible question emojis I could use: 
+    # '\u2753', '\u2754', '\u2049\ufe0f'
+    QUESTION_EMOJI = '\u2753'
 
     # Constructor to init reddit_commands
     # Inputs: bot (discord.Ext.bot)
@@ -63,8 +65,9 @@ class reddit_commands(commands.Cog):
                         $show 4 hotdeals```
                         *The default number of posts to be output is 5.
                     ''',
-            "\u2753 or \u2754 or \u2049\ufe0f": '''React to one of DealzBot's messages with the above emojis to get additional
-                                                   information on the given reddit post.''',
+            f"{self.QUESTION_EMOJI}": '''React to one of DealzBot's $show replies with the above emoji to get additional
+                                         information on the given reddit post. DealzBot will react to every valid message
+                                         with this emoji to indicate when this feature can be used.''',
             "$search": '''For searching a subreddit based on a given time range and query.
                         Valid time ranges are: 'all', 'day', 'hour', 'month', 'week' or 'year'. Default is 'all'
                         Example usage: 
@@ -75,7 +78,7 @@ class reddit_commands(commands.Cog):
                         *The current (hard) limit for search results is 5.
                     '''
         }
-        embed = self._create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
+        embed: discord.Embed = self._create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
         await ctx.reply(embed=embed)
 
     # Function to trigger post breakdown msg when user reacts to a bot post
@@ -91,20 +94,27 @@ class reddit_commands(commands.Cog):
         # emojis.
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
 
-        # Check if message is not from DealzBot
-        if str(reaction.message.author) != self.BOT_ID:
+        # Check if: 1) Message author is not DealzBot or 2) If the reaction author is Dealzbot
+        # 
+        # In case #1, this would mean DealzBot would try, and fail, to search for a reddit post
+        # on ANY reaction on a message in the server. So not good. 
+        # 
+        # In case #2, this would invoke additional coroutines that bog down 
+        # execution time for the show command, and also it looks bad. So we don't want
+        # that.
+        if str(reaction.message.author) != self.BOT_ID or str(user) == self.BOT_ID:
             return
 
         # Check for emoji equality then query for post to get breakdown insights
         if reaction.message.embeds:
             em = reaction.message.embeds[0]
-            if reaction.emoji in self.questionSeqs:
+            if reaction.emoji == self.QUESTION_EMOJI:
                 result = '''Sorry! I could not pull this post's details from Reddit!
                     Try again or give up! :)'''
                 id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
                 result : dict[str, str] = self.rClient.get_post_details_from_id(id)
                 if result: 
-                    embed = self._create_field_embed(result, "Deal Breakdown (Link)", em.url)
+                    embed: discord.Embed = self._create_field_embed(result, "Deal Breakdown (Link)", em.url)
                     await reaction.message.reply(embed=embed)
                     return                    
                 await reaction.message.reply(result)
@@ -128,11 +138,11 @@ class reddit_commands(commands.Cog):
     async def select(self, ctx, arg):
         channel: str = ctx.channel
         userInput: str = arg.lower()
-        if userInput not in self.allowList and not self.rClient.sub_exists(userInput):
+        if userInput not in self.ALLOW_LIST and not self.rClient.sub_exists(userInput):
             await ctx.reply('''Sorry! Either the subreddit is marked as NSFW (Over 18) or it does not exist!''')
         else:
-            # Cache subreddit not already included in allowList to reduce rClient.sub_exists() calls
-            self.allowList.add(userInput)
+            # Cache subreddit not already included in ALLOW_LIST to reduce rClient.sub_exists() calls
+            self.ALLOW_LIST.add(userInput)
             self.rClient.add_or_get_sub(channel, arg)
             await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
@@ -143,7 +153,7 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def show(self, ctx, *args):
         channel: str = ctx.channel
-        sub = self.rClient.add_or_get_sub(channel, '')
+        sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, '')
         # Questionable boolean zen below??? TODO: Review this conditional sequence
         # for optimizations.
         try:
@@ -171,7 +181,7 @@ class reddit_commands(commands.Cog):
             # for post in result.keys():
             #     embed = self._create_general_embed(post, result)
             #     await ctx.send(embed=embed)
-            await self._make_deals_thread(result, ctx.message, sub)
+            await self._make_deals_thread(result, ctx.message, sub, True)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
             traceback.print_exc()
@@ -183,13 +193,13 @@ class reddit_commands(commands.Cog):
     @commands.command()
     async def search(self, ctx, *args):
         channel: str = ctx.channel
-        sub = self.rClient.add_or_get_sub(channel, '')
+        sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, '')
         if len(args) > 1:
             result = sub.search_sub(args[0], args[1])
         else:
             result = sub.search_sub("day", args[0])
         if result:
-            await self._make_deals_thread(result, ctx.message, sub)
+            await self._make_deals_thread(result, ctx.message, sub, True)
         else:
             await ctx.reply("No results in this time range! Try a different one")
 
@@ -198,7 +208,7 @@ class reddit_commands(commands.Cog):
     # Outputs: embed (discord.Embed)
     # Exceptions: None
     def _create_general_embed(self, post, result) -> discord.Embed:
-        embed = discord.Embed(
+        embed: discord.Embed = discord.Embed(
             color=discord.Colour.dark_magenta(),
             url=f'{result[post]}'
         )
@@ -210,7 +220,7 @@ class reddit_commands(commands.Cog):
     # Outputs: embed (discord.Embed)
     # Exceptions: None
     def _create_field_embed(self, result, title, url) -> discord.Embed:
-        embed = discord.Embed(
+        embed: discord.Embed = discord.Embed(
             color=discord.Colour.brand_green(),
             title=title,
             url=url
@@ -223,15 +233,21 @@ class reddit_commands(commands.Cog):
     # Inputs: result - dict[str, str], message - discord.Message, sub - redditClientImpl.reddit_hunter.subreddit_hunter
     # Outputs: None
     # Exceptions: None
-    async def _make_deals_thread(self, result: dict[str, str], message: discord.Message, sub: redditClientImpl.reddit_hunter.subreddit_hunter):
+    async def _make_deals_thread(self, 
+                                 result: dict[str, str], 
+                                 message: discord.Message, 
+                                 sub: redditClientImpl.reddit_hunter.subreddit_hunter,
+                                 isBasic: bool):
         try: 
-            dealsThread = await message.create_thread(name=f'{sub.subreddit} Deals:', auto_archive_duration=self.THREAD_ARCHIVE_DURATION)
+            dealsThread: discord.Thread = await message.create_thread(name=f'{sub.subreddit} Deals:', auto_archive_duration=self.THREAD_ARCHIVE_DURATION)
         except discord.HTTPException: 
             # Could not create thread in this case. TODO: when I add logging need to emit error here
             return
         for post in result.keys():
-            embed = self._create_general_embed(post, result)
-            await dealsThread.send(embed=embed)
+            embed: discord.Embed = self._create_general_embed(post, result)
+            threadMessage: discord.Message = await dealsThread.send(embed=embed)
+            if isBasic: 
+                await threadMessage.add_reaction(self.QUESTION_EMOJI)
 
 # Create discord longging handler and intents
 discordHandler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
