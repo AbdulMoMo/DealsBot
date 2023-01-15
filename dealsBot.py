@@ -1,11 +1,13 @@
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import logging
 import asyncio
 import traceback
 import re
 import os 
 import pprint
+import datetime
 
 import redditClientImpl
 
@@ -26,6 +28,20 @@ class reddit_commands(commands.Cog):
         "gamedealsmeta",
     }
 
+    ID_TO_GUILD = dict()
+
+    SUB_COMMAND_REF = {
+        "hotdeals",
+        "risingdeals",
+        "controversialdeals",
+        "topdeals"
+    }
+
+    LOOP_SUBS = {
+        "gamedeals",
+        "buildapcsales"
+    }
+
     DEFAULT_COUNT = 5
 
     UPPER_COUNT = 10
@@ -44,6 +60,13 @@ class reddit_commands(commands.Cog):
     # Exceptions None 
     def __init__(self, bot):
         self.bot = bot
+
+    async def cog_unload(self):
+        self.deals_report.cancel()
+        try: 
+            await self.deals_report()
+        except asyncio.CancelledError:
+            print("Report task successfully cancelled.")
 
     # Function to provide help information on reddit bot commands
     # Inputs: ctx (discord.ext.Commands.Context)
@@ -203,6 +226,58 @@ class reddit_commands(commands.Cog):
         else:
             await ctx.reply("No results in this time range! Try a different one")
 
+    @commands.command()
+    async def notifyenable(self, ctx):
+        channel_id: int = ctx.channel.id
+        guild: discord.Guild = ctx.guild 
+        self.ID_TO_GUILD[channel_id] = guild
+        await ctx.reply(f"Notifications for {ctx.channel.name} enabled.")
+
+    @commands.command()
+    async def notifydisable(self, ctx):
+        next_loop_time: datetime.datetime = self.deals_report.next_iteration
+        current_time: datetime.datetime = datetime.datetime.now()
+        if next_loop_time.hour == current_time.hour and next_loop_time.minute == current_time.minute:
+            await ctx.reply(f"Notifications are currently in progress. Please try again in a few minutes.")
+        else: 
+            channel_id: int = ctx.channel.id
+            # This will lead to a runtime warning if invoked during deals_report task execution
+            # e.g dict size changed during iteration
+            self.ID_TO_GUILD.pop(channel_id)
+            await ctx.reply(f"Notifications for {ctx.channel.name} disabled.")
+
+    # In my hacky form of testing I would just CTRL + C on my local machine to kill the bot connection.
+    # This seems to trigger another invocation of the loop. Not sure why yet but I assume it's related
+    # to how the asyncio task is scheduled and how I am just trying to force close on it. 
+    @tasks.loop(seconds=60.0, reconnect=True)
+    async def deals_report(self):
+        # Beacuse of this design, where this single task loop will handle all notifications,
+        # even if a client disables notifications for their channel with $notifydisable
+        # it will still execute 
+        for id in self.ID_TO_GUILD:
+            guild: discord.Guild = self.ID_TO_GUILD[id]
+            channel: discord.abc.GuildChannel = guild.get_channel(id)
+            print(f"Executing for {channel} in {guild}")
+            # TODO: Need none check in case channel has been deleted
+            for sub_name in self.LOOP_SUBS: 
+                # Brute force check if notifs were disabled to avoid additional spamming 
+                if not id in self.ID_TO_GUILD: continue
+                sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, sub_name)
+                for command in self.SUB_COMMAND_REF: 
+                    print(command)
+                    result : dict[str, str] = sub.commandToCall[command](self.DEFAULT_COUNT)
+                    # Send message to channel 
+                    msg: discord.Message = await channel.send("Deals report incoming!")
+                    await self._make_deals_thread(result, msg, sub, True)
+                    # Sleep because might get throttled for this
+                    await asyncio.sleep(2.0)          
+
+    # Function to override on_ready event listener to set up bot
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.deals_report.is_running():
+            task: asyncio.Task = self.deals_report.start()
+
     # Function to create a general discord embed for a bot message
     # Inputs: post (str) - post title, result (dict) - varies
     # Outputs: embed (discord.Embed)
@@ -280,9 +355,9 @@ async def hello(ctx):
 # Inputs: bot (discord.Bot)
 # Outputs: None
 # Exceptions: None 
-async def add_cog(bot, cog):
-    await bot.add_cog(cog)
+async def add_cog(bot):
+    await bot.add_cog(reddit_commands(bot))
 
 # Need asyncio to add cog 
-asyncio.run(add_cog(bot, reddit_commands(bot)))
+asyncio.run(add_cog(bot))
 bot.run(discordToken, log_handler=discordHandler)
