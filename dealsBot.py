@@ -50,6 +50,8 @@ class reddit_commands(commands.Cog):
 
     THREAD_ARCHIVE_DURATION = 60
 
+    DEALS_REPORT_INTERNAL_LOOP_COUNT = -1
+
     # Possible question emojis I could use: 
     # '\u2753', '\u2754', '\u2049\ufe0f'
     QUESTION_EMOJI = '\u2753'
@@ -235,9 +237,12 @@ class reddit_commands(commands.Cog):
 
     @commands.command()
     async def notifydisable(self, ctx):
-        next_loop_time: datetime.datetime = self.deals_report.next_iteration
-        current_time: datetime.datetime = datetime.datetime.now()
-        if next_loop_time.hour == current_time.hour and next_loop_time.minute == current_time.minute:
+        current_itr: int = self.deals_report.current_loop
+        # Edge case check. If these two ints dont match that means the loop just hit a new iteration
+        # but deals_report hasn't finished notifying on all the channels in self.ID_TO_GUILD.
+        # current_loop appears to be incremented right when a new iteration begins. So in edge case
+        # where user tries to remove notifications during fresh iteration block them.
+        if current_itr != self.DEALS_REPORT_INTERNAL_LOOP_COUNT:
             await ctx.reply(f"Notifications are currently in progress. Please try again in a few minutes.")
         else: 
             channel_id: int = ctx.channel.id
@@ -249,8 +254,10 @@ class reddit_commands(commands.Cog):
     # In my hacky form of testing I would just CTRL + C on my local machine to kill the bot connection.
     # This seems to trigger another invocation of the loop. Not sure why yet but I assume it's related
     # to how the asyncio task is scheduled and how I am just trying to force close on it. 
-    @tasks.loop(seconds=60.0, reconnect=True)
-    async def deals_report(self):
+    # Though if I $notifydisable on all possible channels, then this does not trigger a deals_report. Likely
+    # because the list in the outer for loop is empty
+    @tasks.loop(hours=6.0, reconnect=True)
+    async def deals_report(self): 
         # Beacuse of this design, where this single task loop will handle all notifications,
         # even if a client disables notifications for their channel with $notifydisable
         # it will still execute 
@@ -260,8 +267,6 @@ class reddit_commands(commands.Cog):
             print(f"Executing for {channel} in {guild}")
             # TODO: Need none check in case channel has been deleted
             for sub_name in self.LOOP_SUBS: 
-                # Brute force check if notifs were disabled to avoid additional spamming 
-                if not id in self.ID_TO_GUILD: continue
                 sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, sub_name)
                 for command in self.SUB_COMMAND_REF: 
                     print(command)
@@ -270,7 +275,8 @@ class reddit_commands(commands.Cog):
                     msg: discord.Message = await channel.send("Deals report incoming!")
                     await self._make_deals_thread(result, msg, sub, True)
                     # Sleep because might get throttled for this
-                    await asyncio.sleep(2.0)          
+                    await asyncio.sleep(5.0)
+        self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 
 
     # Function to override on_ready event listener to set up bot
     @commands.Cog.listener()
