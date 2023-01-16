@@ -7,7 +7,6 @@ import traceback
 import re
 import os 
 import pprint
-import datetime
 
 import redditClientImpl
 
@@ -51,6 +50,8 @@ class reddit_commands(commands.Cog):
     THREAD_ARCHIVE_DURATION = 60
 
     DEALS_REPORT_INTERNAL_LOOP_COUNT = -1
+
+    LOOP_INTERVAL = 6.0
 
     # Possible question emojis I could use: 
     # '\u2753', '\u2754', '\u2049\ufe0f'
@@ -227,16 +228,36 @@ class reddit_commands(commands.Cog):
             await self._make_deals_thread(result, ctx.message, sub, True)
         else:
             await ctx.reply("No results in this time range! Try a different one")
+    
+    # Parent function for enabling/disabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @commands.group()
+    async def notify(self, ctx):
+        # Check if one of the subcommands was invoked
+        if ctx.invoked_subcommand is None:
+            await ctx.reply(
+                "Use either `$notify enable` to enable notifications for this channel or `$notify disable` to disable notifications for this channel.")
+        pass 
 
-    @commands.command()
-    async def notifyenable(self, ctx):
+    # Child function for enabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @notify.command()
+    async def enable(self, ctx):
         channel_id: int = ctx.channel.id
         guild: discord.Guild = ctx.guild 
         self.ID_TO_GUILD[channel_id] = guild
         await ctx.reply(f"Notifications for {ctx.channel.name} enabled.")
 
-    @commands.command()
-    async def notifydisable(self, ctx):
+    # Child function for disabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @notify.command()
+    async def disable(self, ctx):
         current_itr: int = self.deals_report.current_loop
         # Edge case check. If these two ints dont match that means the loop just hit a new iteration
         # but deals_report hasn't finished notifying on all the channels in self.ID_TO_GUILD.
@@ -248,24 +269,25 @@ class reddit_commands(commands.Cog):
             channel_id: int = ctx.channel.id
             # This will lead to a runtime warning if invoked during deals_report task execution
             # e.g dict size changed during iteration
-            self.ID_TO_GUILD.pop(channel_id)
-            await ctx.reply(f"Notifications for {ctx.channel.name} disabled.")
+            if channel_id in self.ID_TO_GUILD:
+                self.ID_TO_GUILD.pop(channel_id)
+                await ctx.reply(f"Notifications for {ctx.channel.name} disabled.")
+            else:
+                await ctx.reply("This channel does not have notifications enabled!")
 
-    # In my hacky form of testing I would just CTRL + C on my local machine to kill the bot connection.
-    # This seems to trigger another invocation of the loop. Not sure why yet but I assume it's related
-    # to how the asyncio task is scheduled and how I am just trying to force close on it. 
-    # Though if I $notifydisable on all possible channels, then this does not trigger a deals_report. Likely
-    # because the list in the outer for loop is empty
-    @tasks.loop(hours=6.0, reconnect=True)
+    # Function to implement the asyncio task that will trigger every LOOP_INTERVAL hours to send 
+    # deals reports to all channels in ID_TO_GUILD.
+    # 
+    # Note: 
+    # In my hacky form of testing I would just CTRL + C to raise a KeyboardInterrupt exception and kill the 
+    # the process. With an asyncio task this also seems to trigger an iteration of deals_report. This will
+    # result in a deals_report to a 'few' channels, since they're sequential notifications.
+    @tasks.loop(hours=LOOP_INTERVAL, reconnect=True)
     async def deals_report(self): 
-        # Beacuse of this design, where this single task loop will handle all notifications,
-        # even if a client disables notifications for their channel with $notifydisable
-        # it will still execute 
         for id in self.ID_TO_GUILD:
             guild: discord.Guild = self.ID_TO_GUILD[id]
             channel: discord.abc.GuildChannel = guild.get_channel(id)
             print(f"Executing for {channel} in {guild}")
-            # TODO: Need none check in case channel has been deleted
             for sub_name in self.LOOP_SUBS: 
                 sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, sub_name)
                 for command in self.SUB_COMMAND_REF: 
@@ -274,7 +296,7 @@ class reddit_commands(commands.Cog):
                     # Send message to channel 
                     msg: discord.Message = await channel.send("Deals report incoming!")
                     await self._make_deals_thread(result, msg, sub, True)
-                    # Sleep because might get throttled for this
+                    # Sleep because might get throttled for this and don't like msg spam at once
                     await asyncio.sleep(5.0)
         self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 
 
