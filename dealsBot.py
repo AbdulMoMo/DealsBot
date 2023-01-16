@@ -29,13 +29,6 @@ class reddit_commands(commands.Cog):
 
     ID_TO_GUILD = dict()
 
-    SUB_COMMAND_REF = {
-        "hotdeals",
-        "risingdeals",
-        "controversialdeals",
-        "topdeals"
-    }
-
     LOOP_SUBS = {
         "gamedeals",
         "buildapcsales"
@@ -51,7 +44,7 @@ class reddit_commands(commands.Cog):
 
     DEALS_REPORT_INTERNAL_LOOP_COUNT = -1
 
-    LOOP_INTERVAL = 6.0
+    LOOP_INTERVAL = 8.0
 
     # Possible question emojis I could use: 
     # '\u2753', '\u2754', '\u2049\ufe0f'
@@ -280,23 +273,21 @@ class reddit_commands(commands.Cog):
     # 
     # Note: 
     # In my hacky form of testing I would just CTRL + C to raise a KeyboardInterrupt exception and kill the 
-    # the process. With an asyncio task this also seems to trigger an iteration of deals_report. This will
+    # the process. With an asyncio task this also seems to trigger a new iteration of deals_report. This will
     # result in a deals_report to a 'few' channels, since they're sequential notifications.
     @tasks.loop(hours=LOOP_INTERVAL, reconnect=True)
     async def deals_report(self): 
         for id in self.ID_TO_GUILD:
             guild: discord.Guild = self.ID_TO_GUILD[id]
             channel: discord.abc.GuildChannel = guild.get_channel(id)
-            print(f"Executing for {channel} in {guild}")
             for sub_name in self.LOOP_SUBS: 
                 sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, sub_name)
-                for command in self.SUB_COMMAND_REF: 
-                    print(command)
+                for command in sub.commandToCall: 
                     result : dict[str, str] = sub.commandToCall[command](self.DEFAULT_COUNT)
                     # Send message to channel 
-                    msg: discord.Message = await channel.send("Deals report incoming!")
+                    msg: discord.Message = await channel.send(f"{command} report incoming for r/{sub_name}!")
                     await self._make_deals_thread(result, msg, sub, True)
-                    # Sleep because might get throttled for this and don't like msg spam at once
+                    # Sleep because might get throttled for this and don't like msg spam
                     await asyncio.sleep(5.0)
         self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 
 
