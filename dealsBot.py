@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import logging
 import asyncio
 import traceback
@@ -26,6 +27,20 @@ class reddit_commands(commands.Cog):
         "gamedealsmeta",
     }
 
+    ID_TO_GUILD = dict()
+
+    SUB_COMMAND_REF = {
+        "hotdeals",
+        "risingdeals",
+        "controversialdeals",
+        "topdeals"
+    }
+
+    LOOP_SUBS = {
+        "gamedeals",
+        "buildapcsales"
+    }
+
     DEFAULT_COUNT = 5
 
     UPPER_COUNT = 10
@@ -33,6 +48,10 @@ class reddit_commands(commands.Cog):
     BOT_ID = 'DealzBot#1632'
 
     THREAD_ARCHIVE_DURATION = 60
+
+    DEALS_REPORT_INTERNAL_LOOP_COUNT = -1
+
+    LOOP_INTERVAL = 6.0
 
     # Possible question emojis I could use: 
     # '\u2753', '\u2754', '\u2049\ufe0f'
@@ -44,6 +63,13 @@ class reddit_commands(commands.Cog):
     # Exceptions None 
     def __init__(self, bot):
         self.bot = bot
+
+    async def cog_unload(self):
+        self.deals_report.cancel()
+        try: 
+            await self.deals_report()
+        except asyncio.CancelledError:
+            print("Report task successfully cancelled.")
 
     # Function to provide help information on reddit bot commands
     # Inputs: ctx (discord.ext.Commands.Context)
@@ -202,6 +228,83 @@ class reddit_commands(commands.Cog):
             await self._make_deals_thread(result, ctx.message, sub, True)
         else:
             await ctx.reply("No results in this time range! Try a different one")
+    
+    # Parent function for enabling/disabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @commands.group()
+    async def notify(self, ctx):
+        # Check if one of the subcommands was invoked
+        if ctx.invoked_subcommand is None:
+            await ctx.reply(
+                "Use either `$notify enable` to enable notifications for this channel or `$notify disable` to disable notifications for this channel.")
+        pass 
+
+    # Child function for enabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @notify.command()
+    async def enable(self, ctx):
+        channel_id: int = ctx.channel.id
+        guild: discord.Guild = ctx.guild 
+        self.ID_TO_GUILD[channel_id] = guild
+        await ctx.reply(f"Notifications for {ctx.channel.name} enabled.")
+
+    # Child function for disabling notifications on a given discord channel
+    # Inputs: ctx (discord.ext.Commands.Context)
+    # Outputs: None
+    # Exceptions: None
+    @notify.command()
+    async def disable(self, ctx):
+        current_itr: int = self.deals_report.current_loop
+        # Edge case check. If these two ints dont match that means the loop just hit a new iteration
+        # but deals_report hasn't finished notifying on all the channels in self.ID_TO_GUILD.
+        # current_loop appears to be incremented right when a new iteration begins. So in edge case
+        # where user tries to remove notifications during fresh iteration block them.
+        if current_itr != self.DEALS_REPORT_INTERNAL_LOOP_COUNT:
+            await ctx.reply(f"Notifications are currently in progress. Please try again in a few minutes.")
+        else: 
+            channel_id: int = ctx.channel.id
+            # This will lead to a runtime warning if invoked during deals_report task execution
+            # e.g dict size changed during iteration
+            if channel_id in self.ID_TO_GUILD:
+                self.ID_TO_GUILD.pop(channel_id)
+                await ctx.reply(f"Notifications for {ctx.channel.name} disabled.")
+            else:
+                await ctx.reply("This channel does not have notifications enabled!")
+
+    # Function to implement the asyncio task that will trigger every LOOP_INTERVAL hours to send 
+    # deals reports to all channels in ID_TO_GUILD.
+    # 
+    # Note: 
+    # In my hacky form of testing I would just CTRL + C to raise a KeyboardInterrupt exception and kill the 
+    # the process. With an asyncio task this also seems to trigger an iteration of deals_report. This will
+    # result in a deals_report to a 'few' channels, since they're sequential notifications.
+    @tasks.loop(hours=LOOP_INTERVAL, reconnect=True)
+    async def deals_report(self): 
+        for id in self.ID_TO_GUILD:
+            guild: discord.Guild = self.ID_TO_GUILD[id]
+            channel: discord.abc.GuildChannel = guild.get_channel(id)
+            print(f"Executing for {channel} in {guild}")
+            for sub_name in self.LOOP_SUBS: 
+                sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, sub_name)
+                for command in self.SUB_COMMAND_REF: 
+                    print(command)
+                    result : dict[str, str] = sub.commandToCall[command](self.DEFAULT_COUNT)
+                    # Send message to channel 
+                    msg: discord.Message = await channel.send("Deals report incoming!")
+                    await self._make_deals_thread(result, msg, sub, True)
+                    # Sleep because might get throttled for this and don't like msg spam at once
+                    await asyncio.sleep(5.0)
+        self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 
+
+    # Function to override on_ready event listener to set up bot
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.deals_report.is_running():
+            task: asyncio.Task = self.deals_report.start()
 
     # Function to create a general discord embed for a bot message
     # Inputs: post (str) - post title, result (dict) - varies
@@ -280,9 +383,9 @@ async def hello(ctx):
 # Inputs: bot (discord.Bot)
 # Outputs: None
 # Exceptions: None 
-async def add_cog(bot, cog):
-    await bot.add_cog(cog)
+async def add_cog(bot):
+    await bot.add_cog(reddit_commands(bot))
 
 # Need asyncio to add cog 
-asyncio.run(add_cog(bot, reddit_commands(bot)))
+asyncio.run(add_cog(bot))
 bot.run(discordToken, log_handler=discordHandler)
