@@ -48,6 +48,7 @@ async def add_cogs(bot):
     await bot.add_cog(redditCog.reddit_commands(bot))
     await bot.add_cog(hltbCog.hltb_commands(bot))
 
+
 # Need asyncio to add cog 
 asyncio.run(add_cogs(bot))
 bot.run(discordToken, log_handler=discordHandler)

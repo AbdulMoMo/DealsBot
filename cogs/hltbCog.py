@@ -1,3 +1,4 @@
+import discord
 from discord.ext import commands
 from howlongtobeatpy import HowLongToBeat
 
@@ -15,10 +16,15 @@ class hltb_commands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command
+    @commands.command()
     async def hltb(self, ctx, arg):
-        result: HowLongToBeat = self.hltbClient.search(arg)
-        if result is None: 
-            await ctx.reply("Sorry! I found no results for this game.")
-        await discordUtils.make_htlb_thread(result, ctx.message)
+        result: dict[str, str] = self.hltbClient.search(arg)
+        if result: 
+            url = result.pop('HLTB Link')
+            name = result.pop('Name')
+            embed: discord.Embed = discordUtils.create_field_embed(result, f"How Long To Beat {name}", url)
+            await ctx.message.reply(embed=embed)
+            return  
+        else:
+            ctx.reply("No matches found for this game!")
         

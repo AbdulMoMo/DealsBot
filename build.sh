@@ -1,4 +1,5 @@
 #!/bin/bash
+# Bash script to handle setup/execution for DealzBot
 
 pip_file="requirements.txt"
 venv=".venv"
