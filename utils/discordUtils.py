@@ -33,6 +33,11 @@ def create_field_embed(result, title, url) -> discord.Embed:
         embed.add_field(name=f"**{field}**", value=f"{result[field]}", inline=False)
     return embed
 
+def set_embed_image(embed: discord.Embed, url):
+    # * means it will only accept kwargs https://github.com/Rapptz/discord.py/issues/647
+    embed.set_image(url=url)
+    return
+
 # Function to create thread (ex. $search and $show) for reddit deals
 # Inputs: result - dict[str, str], message - discord.Message, sub - redditClientImpl.reddit_hunter.subreddit_hunter
 # Outputs: None

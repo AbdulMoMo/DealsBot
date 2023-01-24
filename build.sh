@@ -38,7 +38,7 @@ run() {
 
 activate() {
     #Source activate script for virutal env
-    source "$venv/bin/activate"
+    source $venv/bin/activate
 }
 
 print_env() {

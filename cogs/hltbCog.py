@@ -22,7 +22,10 @@ class hltb_commands(commands.Cog):
         if result: 
             url = result.pop('HLTB Link')
             name = result.pop('Name')
+            image = result.pop('Image')
             embed: discord.Embed = discordUtils.create_field_embed(result, f"How Long To Beat {name}", url)
+            if url:
+                discordUtils.set_embed_image(embed, image)
             await ctx.message.reply(embed=embed)
             return  
         else:

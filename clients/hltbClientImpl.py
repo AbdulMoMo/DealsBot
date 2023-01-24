@@ -9,10 +9,11 @@ class hltb_hunter():
         'review_score': 'Score',
         'profile_dev': 'Developer',
         'release_world': 'Release Year',
-        'main_story': 'Main Story',
-        'main_extra': 'Main + Extra',
-        'completionist': 'Completionist',
-        'all_styles': 'All Styles'
+        'main_story': 'Main Story (Hours)',
+        'main_extra': 'Main + Extra (Hours)',
+        'completionist': 'Completionist (Hours)',
+        'all_styles': 'All Styles (Hours)',
+        'game_image_url': 'Image'
     }
 
     # Constructor for reddit_hunter
@@ -30,7 +31,9 @@ class hltb_hunter():
             # TODO: Sort attr to populate results for making a thread
             best_match_attr = best_match.__dict__.keys()
             # TODO: Doing dict comprehension wrong need to fix this
-            result: dict[str, str] = [[self.FORMAT_GAME_ATTR[key], best_match.key] for key in best_match_attr if key in self.FORMAT_GAME_ATTR]
-            print(result)
+            result: dict[str, str] = dict()
+            for key in best_match_attr: 
+                if key in self.FORMAT_GAME_ATTR: 
+                    result[self.FORMAT_GAME_ATTR[key]] = getattr(best_match, key)
             return result
         return None
