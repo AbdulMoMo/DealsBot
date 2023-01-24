@@ -29,5 +29,5 @@ class hltb_commands(commands.Cog):
             await ctx.message.reply(embed=embed)
             return  
         else:
-            ctx.reply("No matches found for this game!")
+            await ctx.reply("No matches found for this game!")
         
