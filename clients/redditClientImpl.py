@@ -24,17 +24,21 @@ class reddit_hunter:
     # Outputs: None
     # Exceptions: None
     def __init__(self) -> None:
-        self.channelToSub = {}
+        self.channelToSub: dict[str, self.subreddit_hunter] = {}
+        self.NSFW_SUBS: set(str) = set()
 
     # Function to check if a subreddit exists before invoking add_or_get_sub
     # Inputs: subreddit (str) to search for
     # Outputs: True/False
     # Exceptions: NotFound (expected when subreddit is not found)
     def sub_exists(self, subreddit):
+        if subreddit in self.NSFW_SUBS: 
+            return False
         exists = True
         try:
             self.dealFinder.subreddits.search_by_name(subreddit, exact=True)
             if self.dealFinder.subreddit(subreddit).over18:
+                self.NSFW_SUBS.add(subreddit)
                 return False
         except NotFound:
             exists = False
@@ -129,6 +133,7 @@ class reddit_hunter:
             try:
                 result = [(f"[{submission.id}]{submission.title}", f"https://www.reddit.com{submission.permalink}")
                         for submission in self.sub.search(query=query, time_filter=time, limit=5)]
-            except:
+            except ValueError:
                 traceback.print_exc()
+                return None
             return dict(result)
