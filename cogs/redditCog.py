@@ -16,7 +16,7 @@ class reddit_commands(commands.Cog):
     rClient = redditClientImpl.reddit_hunter()
 
     # Allow list to reduce invocations of rClient.sub_exists()
-    ALLOW_LIST = {
+    ALLOW_LIST: set[str] = {
         "gamedeals",
         "buildapcsales",
         "games",
@@ -26,22 +26,20 @@ class reddit_commands(commands.Cog):
 
     ID_TO_GUILD = dict()
 
-    LOOP_SUBS = {
+    LOOP_SUBS: set[str] = {
         "gamedeals",
         "buildapcsales"
     }
 
-    DEFAULT_COUNT = 5
+    DEFAULT_COUNT: int = 5
 
-    UPPER_COUNT = 10
+    UPPER_COUNT: int = 10
 
-    BOT_ID = 'DealzBot#1632'
+    BOT_ID: str = 'DealzBot#1632'
 
-    THREAD_ARCHIVE_DURATION = 60
+    DEALS_REPORT_INTERNAL_LOOP_COUNT: int = -1
 
-    DEALS_REPORT_INTERNAL_LOOP_COUNT = -1
-
-    LOOP_INTERVAL = 8.0
+    LOOP_INTERVAL: float = 8.0
 
     # Possible question emojis I could use: 
     # '\u2753', '\u2754', '\u2049\ufe0f'
@@ -123,12 +121,12 @@ class reddit_commands(commands.Cog):
 
         # Check for emoji equality then query for post to get breakdown insights
         if reaction.message.embeds:
-            em = reaction.message.embeds[0]
+            em: discord.Embed = reaction.message.embeds[0]
             if reaction.emoji == self.QUESTION_EMOJI:
-                result = '''Sorry! I could not pull this post's details from Reddit!
+                result: str = '''Sorry! I could not pull this post's details from Reddit!
                     Try again or give up! :)'''
-                id : str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
-                result : dict[str, str] = self.rClient.get_post_details_from_id(id)
+                id: str = re.search(r"\[([A-Za-z0-9_]+)\]", em.description).group(1)
+                result: dict[str, str] = self.rClient.get_post_details_from_id(id)
                 if result: 
                     embed: discord.Embed = discordUtils.create_field_embed(result, "Deal Breakdown (Link)", em.url)
                     await reaction.message.reply(embed=embed)
@@ -155,7 +153,7 @@ class reddit_commands(commands.Cog):
         channel: str = ctx.channel
         userInput: str = arg.lower()
         if userInput not in self.ALLOW_LIST and not self.rClient.sub_exists(userInput):
-            await ctx.reply('''Sorry! Either the subreddit is marked as NSFW (Over 18) or it does not exist!''')
+            await ctx.reply("Sorry! Either the subreddit is marked as NSFW (Over 18) or it does not exist!")
         else:
             # Cache subreddit not already included in ALLOW_LIST to reduce rClient.sub_exists() calls
             self.ALLOW_LIST.add(userInput)
@@ -173,7 +171,7 @@ class reddit_commands(commands.Cog):
         # Questionable boolean zen below??? TODO: Review this conditional sequence
         # for optimizations.
         try:
-            # For show expect one or two args:
+            # For show expect one or two args in 'happy' cases:
             # $show 5 hotdeals
             # $show hotdeals
             # args[0] = number OR commandToCall value
@@ -183,7 +181,7 @@ class reddit_commands(commands.Cog):
 
             # Should correspond to commandToCall value
             if len(args) > 1:
-                subFilter = args[1]
+                subFilter: str = args[1]
 
             if isNumInput and int(countOrCommand) <= self.UPPER_COUNT:
                 result : dict[str, str] = sub.commandToCall[subFilter](int(countOrCommand))
@@ -197,7 +195,7 @@ class reddit_commands(commands.Cog):
             # for post in result.keys():
             #     embed = discordUtils.create_general_embed(post, result)
             #     await ctx.send(embed=embed)
-            await discordUtils.make_deals_thread(result, ctx.message, sub, True)
+            await discordUtils.make_thread(result, ctx.message, f'{sub.subreddit} Deals', True)
         except:
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
             traceback.print_exc()
@@ -210,14 +208,21 @@ class reddit_commands(commands.Cog):
     async def search(self, ctx, *args):
         channel: str = ctx.channel
         sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, '')
+        # For search expect one or two args in 'happy' cases:
+        # $search day game
+        # $search game
+        # args[0] = time_filter OR search query
+        # args[1] (if exists) = search query
+        timeFilterOrQuery: str = args[0]
         if len(args) > 1:
-            result = sub.search_sub(args[0], args[1])
+            query: str = args[1]
+            result: dict[str, str] = sub.search_sub(timeFilterOrQuery, query)
         else:
-            result = sub.search_sub("day", args[0])
+            result: dict[str, str] = sub.search_sub("day", timeFilterOrQuery)
         if result:
-            await discordUtils.make_deals_thread(result, ctx.message, sub, True)
+            await discordUtils.make_thread(result, ctx.message, f'{sub.subreddit} Deals', True)
         else:
-            await ctx.reply("No results in this time range! Try a different one")
+            await ctx.reply("No results in this time range! Double check your usage with $reddithelp or try a different query.")
     
     # Parent function for enabling/disabling notifications on a given discord channel
     # Inputs: ctx (discord.ext.Commands.Context)
@@ -283,7 +288,7 @@ class reddit_commands(commands.Cog):
                     result : dict[str, str] = sub.commandToCall[command](self.DEFAULT_COUNT)
                     # Send message to channel 
                     msg: discord.Message = await channel.send(f"{command} report incoming for r/{sub_name}!")
-                    await discordUtils.make_deals_thread(result, msg, sub, True)
+                    await discordUtils.make_thread(result, msg, f'{sub.subreddit} Deals', True)
                     # Sleep because might get throttled for this and don't like msg spam
                     await asyncio.sleep(5.0)
         self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 

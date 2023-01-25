@@ -1,10 +1,10 @@
 import discord
 import clients.redditClientImpl as redditClientImpl
 
-THREAD_ARCHIVE_DURATION = 60
+THREAD_ARCHIVE_DURATION: int = 60
 
 # Possible question emojis I could use: 
-    # '\u2753', '\u2754', '\u2049\ufe0f'
+# '\u2753', '\u2754', '\u2049\ufe0f'
 QUESTION_EMOJI = '\u2753'
 
 # Function to create a general discord embed for a bot message
@@ -39,36 +39,20 @@ def set_embed_image(embed: discord.Embed, url):
     return
 
 # Function to create thread (ex. $search and $show) for reddit deals
-# Inputs: result - dict[str, str], message - discord.Message, sub - redditClientImpl.reddit_hunter.subreddit_hunter
+# Inputs: result - dict[str, str], message - discord.Message, name - str
 # Outputs: None
 # Exceptions: None
-async def make_deals_thread(result: dict[str, str], 
+async def make_thread(result: dict[str, str], 
                             message: discord.Message, 
-                            sub: redditClientImpl.reddit_hunter.subreddit_hunter,
+                            threadName: str,
                             isBasic: bool):
     try: 
-        dealsThread: discord.Thread = await message.create_thread(name=f'{sub.subreddit} Deals:', auto_archive_duration=THREAD_ARCHIVE_DURATION)
+        thread: discord.Thread = await message.create_thread(name=threadName, auto_archive_duration=THREAD_ARCHIVE_DURATION)
     except discord.HTTPException: 
         # Could not create thread in this case. TODO: when I add logging need to emit error here
         return
     for post in result.keys():
         embed: discord.Embed = create_general_embed(post, result)
-        threadMessage: discord.Message = await dealsThread.send(embed=embed)
+        threadMessage: discord.Message = await thread.send(embed=embed)
         if isBasic: 
             await threadMessage.add_reaction(QUESTION_EMOJI)
-
-# Function to create thread for hltb results
-# Inputs: result - dict[str, str], message - discord.Message, sub - redditClientImpl.reddit_hunter.subreddit_hunter
-# Outputs: None
-# Exceptions: None
-async def make_hltb_thread(result: dict[str, str], 
-                           message: discord.Message):
-    try: 
-        hltbThread: discord.Thread = await message.create_thread(name='HowLongToBeat Results', auto_archive_duration=THREAD_ARCHIVE_DURATION)
-    except discord.HTTPException: 
-        # Could not create thread in this case. TODO: when I add logging need to emit error here
-        return
-    for post in result.keys():
-        embed: discord.Embed = create_general_embed(post, result)
-        threadMessage: discord.Message = await hltbThread.send(embed=embed)
-    
