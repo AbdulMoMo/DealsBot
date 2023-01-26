@@ -2,13 +2,30 @@
 
 # Table of Contents
 
-1. [Introduction](#introduction)
+1. [Changelog](#changelog-new)
+2. [Introduction](#introduction)
 2. [Why Reddit?](#why-reddit)
 3. [Reddit Commands](#reddit-commands)
 4. [Future Releases](#future-releases)
 5. [Steam Commands](#steam-commands-tbd)
 6. [DealzBot Design and Thoughts](#dealzbot-design-and-thougts)
 7. [Bug Reporting](#bug-reporting)
+
+## Changelog (NEW)
+
+To try and keep up with the pace of of my own changes to DealzBot. I will now be adding a changelog at the top of the README to keep up with latest changes. Ideally this oldest updates will be cleared out and incorporated into the README itself. 
+
+1/25/2023
+- Added a new feature for automatic notifications! This consists of two commands:
+  - `$notifyenable` for enabling notifications at the channel level 
+  - `$notifydisable` for disabling notifications at the channel level 
+  - Use `$reddithelp` for more details
+- HowLongToBeat integration! Now you can use the command `$hltb <game_name>` to have DealzBot return you the HowLongToBeat information on a given game. 
+  - For multi-word queries use `""` to enclose the search query
+- A refactoring of the DealzBot project to improve readibility and reduce code redundancy. (It had also proved simpler to implement HowLongToBeat functionality after cleaning up the project structure)
+  - Still pending changes  in the `operations` space are: 
+    - Updates to all comments in Python docstrings format 
+    - Revamped logging for easier debugging
 
 ---
 

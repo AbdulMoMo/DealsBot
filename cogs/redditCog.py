@@ -59,12 +59,15 @@ class reddit_commands(commands.Cog):
         except asyncio.CancelledError:
             print("Report task successfully cancelled.")
 
-    # Function to provide help information on reddit bot commands
-    # Inputs: ctx (discord.ext.Commands.Context)
-    # Outputs: None
-    # Exceptions: None
     @commands.command()
     async def reddithelp(self, ctx):
+        """Function to provide help information on reddit bot commands
+
+        Args:
+            ctx (discord.ext.Commands.Context): required arg for command
+        Exceptions:
+            None
+        """
         # Cursed formatting but this works. Need to fix
         helpRef: dict[str, str] = {
             "$select": '''To select a subreddit. This is set at the channel level. The default subreddit is r/GameDeals.
@@ -83,16 +86,21 @@ class reddit_commands(commands.Cog):
                                          information on the given reddit post. DealzBot will react to every valid message
                                          with this emoji to indicate when this feature can be used.''',
             "$search": '''For searching a subreddit based on a given time range and query.
-                        Valid time ranges are: 'all', 'day', 'hour', 'month', 'week' or 'year'. Default is 'all'
+                        Valid time ranges are: `all`, `day`, `hour`, `month`, `week` or `year`. Default is `day`
                         Example usage: 
                         ```
                         $search week destiny 
                         $search aoc
                         $search hour minecraft```
                         *The current (hard) limit for search results is 5.
-                    '''
+                    ''',
+            "$currentsub": '''Displays the current subreddit for the channel.''',
+            "$notifyenable": f'''Enables notifications for the current channel. DealzBot will send notifications on a regular interval every 
+                            {self.LOOP_INTERVAL} hours from deals oriented subreddits. This setting is set at the channel level.''',
+            "$notifydisable": f'''Disables notifications for the current channel. This setting is set at the channel level.''',
+
         }
-        embed: discord.Embed = self._create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
+        embed: discord.Embed = discordUtils.create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
         await ctx.reply(embed=embed)
 
     # Function to trigger post breakdown msg when user reacts to a bot post
