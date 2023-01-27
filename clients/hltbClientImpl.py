@@ -1,6 +1,8 @@
 from howlongtobeatpy import HowLongToBeat
 
 class hltb_hunter():
+    """Class to encaspulate HowLongToBeat client implementation
+    """
 
     FORMAT_GAME_ATTR: dict[str, str] = {
         'game_name': 'Name',
@@ -16,15 +18,27 @@ class hltb_hunter():
         'game_image_url': 'Image'
     }
 
-    # Constructor for reddit_hunter
-    # Inputs: None
-    # Outputs: None
-    # Exceptions: None
     def __init__(self) -> None:
+        """Constructor for hltb_hunter
+
+        Args:
+            None
+        Exceptions:
+            None
+        """
         self.hltbClient = HowLongToBeat()
 
     # Note: Ref for HTLB Entry: https://github.com/ScrappyCocco/HowLongToBeat-PythonAPI/blob/master/howlongtobeatpy/howlongtobeatpy/HowLongToBeatEntry.py
     def search(self, query: str) -> HowLongToBeat:
+        """Function for querying HowLongToBeat given an input query
+
+        Args:
+            query (str): search query
+        Exceptions:
+            None
+        Note: 
+            Ref for HTLB Entry: https://github.com/ScrappyCocco/HowLongToBeat-PythonAPI/blob/master/howlongtobeatpy/howlongtobeatpy/HowLongToBeatEntry.py
+        """
         results: list[HowLongToBeat] = self.hltbClient.search(query)
         if results is not None and len(results) > 0:
             best_match: HowLongToBeat = max(results, key=lambda element: element.similarity)

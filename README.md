@@ -24,7 +24,8 @@ To try and keep up with the pace of of my own changes to DealzBot. I will now be
   - For multi-word queries use `""` to enclose the search query
 - A refactoring of the DealzBot project to improve readibility and reduce code redundancy. (It had also proved simpler to implement HowLongToBeat functionality after cleaning up the project structure)
   - Still pending changes  in the `operations` space are: 
-    - Updates to all comments in Python docstrings format 
+    - ~~Updates to all comments in Python docstrings format~~
+      - 1/26 all current classes now are commented in doc strings format!
     - Revamped logging for easier debugging
 
 ---

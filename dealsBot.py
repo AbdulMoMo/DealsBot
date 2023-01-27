@@ -23,28 +23,32 @@ activity = discord.Activity(name='for them dealz', type=discord.ActivityType.wat
 bot = commands.Bot(command_prefix='$', intents=intents, activity=activity)
 bot.remove_command('help')
 
-# Function to give help information
-# Inputs: ctx (discord.ext.Commands.Context)
-# Outputs: None
-# Exceptions: None
-# TODO: Make a proper help function within the reddit_commands class that replies to user with commands guide
 @bot.command()
 async def help(ctx):
+    """Function to give help information
+
+    Args:
+        ctx (discord.ext.Commands.Context): Discord context for command invocation
+    """
     await ctx.reply("Please note the default subreddit is r/GameDeals. For reddit specific commands, use `$reddithelp` to get more information!")
 
-# Function to say hello to user
-# Inputs: ctx (discord.ext.Commands.Context)
-# Outputs: None
-# Exceptions: None
 @bot.command()
 async def hello(ctx):
+    """Function to say hello to user
+
+    Args:
+        ctx (discord.ext.Commands.Context): Discord context for command invocation
+    """
     await ctx.reply(f"Are ya ready for some deals {ctx.author}?")
 
-# Function to add cog to discord bot 
-# Inputs: bot (discord.Bot)
-# Outputs: None
-# Exceptions: None 
 async def add_cogs(bot):
+    """Function to add cog to discord bot
+
+    Args:
+        bot (discord.Bot)
+    Exceptions:
+        None
+    """
     await bot.add_cog(redditCog.reddit_commands(bot))
     await bot.add_cog(hltbCog.hltb_commands(bot))
 

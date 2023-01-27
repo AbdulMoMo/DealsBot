@@ -50,6 +50,13 @@ class reddit_commands(commands.Cog):
     # Outputs: None 
     # Exceptions None 
     def __init__(self, bot):
+        """Constructor to init reddit_commands
+
+        Args:
+            bot (discord.Ext.bot): required arg for child Cog
+        Exceptions:
+            None
+        """
         self.bot = bot
 
     async def cog_unload(self):
@@ -61,7 +68,7 @@ class reddit_commands(commands.Cog):
 
     @commands.command()
     async def reddithelp(self, ctx):
-        """Function to provide help information on reddit bot commands
+        """Function to provide help information on `reddit_commands` commands
 
         Args:
             ctx (discord.ext.Commands.Context): required arg for command
@@ -100,18 +107,22 @@ class reddit_commands(commands.Cog):
             "$notifydisable": f'''Disables notifications for the current channel. This setting is set at the channel level.''',
 
         }
-        embed: discord.Embed = discordUtils.create_field_embed(helpRef, "DealzBot User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
+        embed: discord.Embed = discordUtils.create_field_embed(helpRef, "`$re` User Guide", "https://github.com/AbdulMoMo/DealsBot/blob/main/README.md")
         await ctx.reply(embed=embed)
 
-    # Function to trigger post breakdown msg when user reacts to a bot post
-    # Inputs: reaction (discord.Emoji), user (discord.User)
-    # Outputs: None
-    # Exceptions: None
-    # Note: Client doesn't have to have access to messages in the channel before it was
-    # instanatiated. That means the internal message cache is only valid for n messages,
-    # up to 1000, from the point in time the discord client was up. 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
+        """Function to trigger post breakdown msg when user reacts to a bot pos
+
+        Args:
+            reaction (discord.Emoji): Discord emoji, user (discord.User): ref of a Discord user
+        Exceptions:
+            None
+        
+        Note: Client doesn't have to have access to messages in the channel before it was
+        instanatiated. That means the internal message cache is only valid for n messages,
+        up to 1000, from the point in time the discord client was up.
+        """
         # Used below statement to get unicode escape sequence for question mark
         # emojis.
         # reactionSeq = reaction.emoji.encode('unicode-escape').decode('ASCII')
@@ -143,21 +154,28 @@ class reddit_commands(commands.Cog):
             else:
                 return
 
-    # Function to reply to user with the current subreddit for a channel
-    # Inputs: ctx (discord.ext.commands.Context)
-    # Outputs: None
-    # Exceptions None
     @commands.command()
     async def currentsub(self, ctx):
+        """Function to reply to user with the current subreddit for a channel
+
+        Args:
+            ctx (discord.ext.commands.Context) - Discord context for command invocation
+        Exceptions:
+            None
+        """
         channel: str = ctx.channel
         await ctx.reply(f"r/{self.rClient.add_or_get_sub(channel, '').subreddit}")
 
-    # Function to select a subreddit for the discord channel
-    # Inputs: ctx (discord.ext.Commands.Context), arg (str) - command keyword argument
-    # Ouputs: None
-    # Exceptions: None
     @commands.command()
     async def select(self, ctx, arg):
+        """Function to select a subreddit for the discord channel
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation,
+            arg (str) - command keyword argument
+        Exceptions:
+            None
+        """
         channel: str = ctx.channel
         userInput: str = arg.lower()
         if userInput not in self.ALLOW_LIST and not self.rClient.sub_exists(userInput):
@@ -168,12 +186,17 @@ class reddit_commands(commands.Cog):
             self.rClient.add_or_get_sub(channel, arg)
             await ctx.reply(f"The subreddit set is now r/{self.rClient.channelToSub[channel].subreddit}")
 
-    # Function to pull post results based on top/hot/rising/controversial
-    # Inputs: ctx (discord.ext.Commands.Context), args (List[str])
-    # Outputs: None
-    # Exceptions TBD
+
     @commands.command()
     async def show(self, ctx, *args):
+        """Function to pull post results based on top/hot/rising/controversial
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation, 
+            args (List[str]): kwargs from user 
+        Exceptions:
+            TBD
+        """
         channel: str = ctx.channel
         sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, '')
         # Questionable boolean zen below??? TODO: Review this conditional sequence
@@ -208,12 +231,16 @@ class reddit_commands(commands.Cog):
             await ctx.reply(f"Please check that your chosen subreddit is spelled correctly and exists. Set again with $select")
             traceback.print_exc()
     
-    # Function to search a subreddit based on a query and time range
-    # Inputs: ctx (discord.ext.Commands.Context), args (List[str])
-    # Outputs: None
-    # Exceptions: None
     @commands.command()
     async def search(self, ctx, *args):
+        """Function to search a subreddit based on a query and time range
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation, 
+            args (List[str]): kwargs from user 
+        Exceptions:
+            TBD
+        """
         channel: str = ctx.channel
         sub: redditClientImpl.reddit_hunter.subreddit_hunter = self.rClient.add_or_get_sub(channel, '')
         # For search expect one or two args in 'happy' cases:
@@ -232,35 +259,44 @@ class reddit_commands(commands.Cog):
         else:
             await ctx.reply("No results in this time range! Double check your usage with $reddithelp or try a different query.")
     
-    # Parent function for enabling/disabling notifications on a given discord channel
-    # Inputs: ctx (discord.ext.Commands.Context)
-    # Outputs: None
-    # Exceptions: None
     @commands.group()
     async def notify(self, ctx):
-        # Check if one of the subcommands was invoked
+        """Parent function for enabling/disabling notifications on a given discord channel
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation
+        Exceptions:
+            TBD
+        """
         if ctx.invoked_subcommand is None:
             await ctx.reply(
                 "Use either `$notify enable` to enable notifications for this channel or `$notify disable` to disable notifications for this channel.")
         pass 
 
-    # Child function for enabling notifications on a given discord channel
-    # Inputs: ctx (discord.ext.Commands.Context)
-    # Outputs: None
-    # Exceptions: None
+
     @notify.command()
     async def enable(self, ctx):
+        """Child function for enabling notifications on a given discord channel
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation
+        Exceptions:
+            TBD
+        """
         channel_id: int = ctx.channel.id
         guild: discord.Guild = ctx.guild 
         self.ID_TO_GUILD[channel_id] = guild
         await ctx.reply(f"Notifications for {ctx.channel.name} enabled.")
 
-    # Child function for disabling notifications on a given discord channel
-    # Inputs: ctx (discord.ext.Commands.Context)
-    # Outputs: None
-    # Exceptions: None
     @notify.command()
     async def disable(self, ctx):
+        """Child function for disabling notifications on a given discord channel
+
+        Args:
+            ctx (discord.ext.Commands.Context): Discord context for command invocation
+        Exceptions:
+            TBD
+        """
         current_itr: int = self.deals_report.current_loop
         # Edge case check. If these two ints dont match that means the loop just hit a new iteration
         # but deals_report hasn't finished notifying on all the channels in self.ID_TO_GUILD.
@@ -278,15 +314,20 @@ class reddit_commands(commands.Cog):
             else:
                 await ctx.reply("This channel does not have notifications enabled!")
 
-    # Function to implement the asyncio task that will trigger every LOOP_INTERVAL hours to send 
-    # deals reports to all channels in ID_TO_GUILD.
-    # 
-    # Note: 
-    # In my hacky form of testing I would just CTRL + C to raise a KeyboardInterrupt exception and kill the 
-    # the process. With an asyncio task this also seems to trigger a new iteration of deals_report. This will
-    # result in a deals_report to a 'few' channels, since they're sequential notifications.
     @tasks.loop(hours=LOOP_INTERVAL, reconnect=True)
     async def deals_report(self): 
+        """Function to implement the asyncio task that will trigger every LOOP_INTERVAL hours to send 
+        deals reports to all channels in ID_TO_GUILD.
+
+        Args:
+            None
+        Exceptions:
+            TBD
+        Note: 
+        In my hacky form of testing I would just CTRL + C to raise a KeyboardInterrupt exception and kill the 
+        the process. With an asyncio task this also seems to trigger a new iteration of deals_report. This will
+        result in a deals_report to a 'few' channels, since they're sequential notifications.
+        """
         for id in self.ID_TO_GUILD:
             guild: discord.Guild = self.ID_TO_GUILD[id]
             channel: discord.abc.GuildChannel = guild.get_channel(id)
@@ -301,8 +342,14 @@ class reddit_commands(commands.Cog):
                     await asyncio.sleep(5.0)
         self.DEALS_REPORT_INTERNAL_LOOP_COUNT += 1; 
 
-    # Function to override on_ready event listener to set up bot
     @commands.Cog.listener()
     async def on_ready(self):
+        """Function to override on_ready event listener to set up bot
+
+        Args:
+            None
+        Exceptions:
+            TBD
+        """
         if not self.deals_report.is_running():
             task: asyncio.Task = self.deals_report.start()
