@@ -13,11 +13,12 @@ setup_env() {
         echo "Failed to create virtual env"
     fi 
 
-    #Source activate script for virutal env
-    activate
+    # Source activate script for virutal env
+    # Can't source in non-interactive shell
+    # activate
 
     # Install project dependencies
-    if pip install -r $pip_file; then
+    if pip3 install -r $pip_file; then
         echo "Installed project dependencies from $pip_file"
     else 
         echo "Failed to install project depenencies from $pip_file. Please check if exists."
@@ -25,7 +26,7 @@ setup_env() {
 }
 
 freeze() {
-    if pip freeze > $pip_file; then 
+    if pip3 freeze > $pip_file; then 
         echo "Env dependencies set in $pip_file"
     else 
         echo "Failed to freeze dependencies in $pip_file"
@@ -38,11 +39,11 @@ run() {
 
 activate() {
     #Source activate script for virutal env
-    source $venv/bin/activate
+    echo "source $venv/bin/activate"
 }
 
 print_env() {
-    pip -V
+    pip3 -V
 }
 
 help() {
